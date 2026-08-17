@@ -42,8 +42,8 @@
     };
     const stringManifest = JSON.stringify(manifestData);
     const blobManifest = new Blob([stringManifest], {type: 'application/json'});
-    const manifestURL = URL.createObjectURL(blobManifest);
-    document.getElementById('manifest-placeholder')?.setAttribute('href', manifestURL);
+    const manifest = .createObject(blobManifest);
+    document.getElementById('manifest-placeholder')?.setAttribute('href', manifest);
   </script>
 
   <script src="https://cdn.tailwindcss.com"></script>
@@ -656,7 +656,7 @@
   </div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbyWyi8YEn6vqC5TXLJ_PwwL93RpuxWhe8on4tMHuyoX2I6KYRYmhzYLTLzkxYSJDbp6/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwpuAiqrmzl8SL5dp9WOucX-w47vWBKI38zwHAGCrpCHOKzs0_yzSRKZGLFvde6z6lMhw/exec";
 
     let currentUser = null;
     let isAdmin = false;
