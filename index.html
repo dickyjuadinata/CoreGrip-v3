@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="en" class="overflow-x-hidden">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>CoreGrip</title>
+  
+  <meta name="theme-color" content="#0066FF">
+  <meta name="description" content="CoreGrip - Enterprise-grade resistance training log and auto-progression tracking application.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="CoreGrip">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/5200/5200814.png">
+  <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/5200/5200814.png">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <script>
+    const manifestData = {
+      "name": "CoreGrip",
+      "short_name": "CoreGrip",
+      "start_url": "./",
+      "display": "standalone",
+      "background_color": "#f9fafb",
+      "theme_color": "#0066FF",
+      "description": "CoreGrip - Enterprise-grade resistance training log and auto-progression tracking application.",
+      "icons": [
+        {
+          "src": "https://cdn-icons-png.flaticon.com/512/5200/5200814.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        },
+        {
+          "src": "https://cdn-icons-png.flaticon.com/512/5200/5200814.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    };
+    const stringManifest = JSON.stringify(manifestData);
+    const blobManifest = new Blob([stringManifest], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(blobManifest);
+    document.getElementById('manifest-placeholder')?.setAttribute('href', manifestURL);
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    :root {
+      --bg-page: #f9fafb;
+      --bg-card: #ffffff;
+      --bg-header: #161B26;
+      --text-header: #ffffff;
+      --bg-subcard: #eff6ff;
+      --bg-input: #ffffff;
+      --text-main: #1f2937;
+      --text-muted: #6b7280;
+      --border-color: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --accent-primary: #0066FF;
+      --accent-hover: #0052cc;
+      --shadow-color: rgba(0, 102, 255, 0.08);
+      --table-header-bg: #eff6ff;
+      --table-header-text: #0066FF;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-page: #0f172a;
+        --bg-card: #1e293b;
+        --bg-header: #161B26;
+        --text-header: #f8fafc;
+        --bg-subcard: rgba(30, 58, 138, 0.4);
+        --bg-input: #0f172a;
+        --text-main: #f8fafc;
+        --text-muted: #cbd5e1;
+        --border-color: #334155;
+        --border-strong: #475569;
+        --accent-primary: #3b82f6;
+        --accent-hover: #60a5fa;
+        --shadow-color: rgba(0, 0, 0, 0.3);
+        --table-header-bg: rgba(30, 58, 138, 0.4);
+        --table-header-text: #f8fafc;
+      }
+    }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .themed-header {
+      background-color: var(--bg-header);
+      color: var(--text-header);
+    }
+
+    .themed-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 10px 25px -5px var(--shadow-color);
+    }
+
+    .themed-subcard {
+      background-color: var(--bg-subcard);
+      border: 1px solid var(--border-color);
+    }
+
+    .themed-input {
+      background-color: var(--bg-input) !important;
+      border-color: var(--border-strong) !important;
+      color: var(--text-main) !important;
+      transition: all 0.2s ease;
+    }
+
+    .themed-input:focus {
+      border-color: var(--accent-primary) !important;
+      box-shadow: 0 0 0 3px var(--shadow-color) !important;
+    }
+
+    .themed-text-muted {
+      color: var(--text-muted);
+    }
+
+    .themed-table-header {
+      background-color: var(--table-header-bg);
+      color: var(--table-header-text);
+    }
+
+    html, body {
+      overflow-x: hidden;
+      max-width: 100vw;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar { 
+      width: 6px; 
+      height: 6px; 
+    }
+    .custom-scrollbar::-webkit-scrollbar-track { 
+      background: transparent; 
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb { 
+      background: var(--border-strong); 
+      border-radius: 4px; 
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { 
+      background: var(--accent-primary); 
+    }
+    
+    @media (max-width: 640px) {
+      input, select, button {
+        min-height: 44px;
+        font-size: 16px !important;
+      }
+    }
+  </style>
+</head>
+<body class="font-sans min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white relative overflow-x-hidden w-full">
+
+  <!-- Header & Navigation -->
+  <header class="themed-header border-b border-gray-800 shadow-sm sticky top-0 z-40 w-full transition-colors duration-300">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex justify-between items-center w-full h-14">
+      <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-2">
+          <div class="bg-blue-600 p-1.5 rounded-lg shadow-inner shrink-0 flex items-center justify-center">
+            <i data-lucide="dumbbell" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <h1 class="font-black tracking-wider text-sm md:text-base leading-none uppercase text-white">CoreGrip</h1>
+          </div>
+        </div>
+
+        <nav id="headerNavTabs" class="hidden md:flex items-center space-x-1">
+          <button id="navWorkoutBtn" onclick="switchAppTab('workout')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition text-white bg-blue-600 flex items-center gap-2">
+            <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i> Workout Log
+          </button>
+          <button id="navAnalyticsBtn" onclick="switchAppTab('analytics')" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg transition text-gray-300 hover:text-white hover:bg-white/10 flex items-center gap-2">
+            <i data-lucide="line-chart" class="w-3.5 h-3.5"></i> Performance Analytics
+          </button>
+        </nav>
+      </div>
+      
+      <div class="flex items-center space-x-3 h-full">
+        <p class="hidden text-xs opacity-90 items-center gap-1.5 cursor-pointer hover:bg-white/10 transition bg-transparent px-3 py-1.5 rounded-lg border border-white/20 h-8 text-white" id="syncStatus" onclick="showSyncDetailModal()">
+          <span id="statusIndicator" class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-sm shadow-emerald-400"></span>
+          <span id="statusText">Online · Synced</span>
+        </p>
+
+        <button id="mobileMenuBtn" onclick="toggleMobileDrawer()" class="hidden md:hidden text-white p-2 rounded-lg hover:bg-white/10 focus:outline-none">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+
+        <button id="signOutBtnHeader" onclick="handleLogout()" class="hidden text-xs bg-transparent hover:bg-white/10 text-white border border-white/20 px-3 py-1.5 rounded-lg transition items-center gap-1.5 active:scale-95 font-semibold h-8">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Sign Out</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="mobileDrawer" class="hidden md:hidden border-t border-gray-800 bg-[#161B26] px-4 py-3 space-y-2 transition-all duration-300">
+      <button id="mobileNavWorkoutBtn" onclick="switchAppTab('workout'); toggleMobileDrawer(false);" class="w-full text-left px-4 py-2 text-xs font-bold rounded-lg text-white bg-blue-600 flex items-center gap-2">
+        <i data-lucide="clipboard-list" class="w-4 h-4"></i> Workout Log
+      </button>
+      <button id="mobileNavAnalyticsBtn" onclick="switchAppTab('analytics'); toggleMobileDrawer(false);" class="w-full text-left px-4 py-2 text-xs font-semibold rounded-lg text-gray-300 hover:text-white hover:bg-white/10 flex items-center gap-2">
+        <i data-lucide="line-chart" class="w-4 h-4"></i> Performance Analytics
+      </button>
+      <div class="border-t border-gray-800 my-1"></div>
+      <button id="mobileSignOutBtn" onclick="handleLogout(); toggleMobileDrawer(false);" class="w-full text-left px-4 py-2 text-xs font-semibold rounded-lg text-red-400 hover:text-red-300 bg-transparent hover:bg-white/10 border border-red-500/30 flex items-center gap-2 transition">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
+      </button>
+    </div>
+  </header>
+
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6 overflow-x-hidden">
+
+    <div id="authSection" class="max-w-xl mx-auto my-8 md:my-12 themed-card rounded-2xl shadow-xl overflow-hidden">
+      <div class="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800">
+        <button id="tabLoginBtn" onclick="switchAuthTab('login')" class="flex-1 py-3 px-2 font-bold text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 transition text-xs sm:text-sm text-center">Sign In</button>
+        <button id="tabRegisterBtn" onclick="switchAuthTab('register')" class="flex-1 py-3 px-2 font-bold themed-text-muted hover:text-blue-500 transition text-xs sm:text-sm text-center">Register & Assessment</button>
+      </div>
+
+      <form id="formLogin" onsubmit="submitLogin(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-semibold themed-text-muted mb-1.5">Username</label>
+          <input type="text" id="loginUsername" required placeholder="Enter your username" class="w-full px-4 py-2.5 rounded-xl themed-input border focus:ring-2 focus:outline-none enter-nav" data-next="loginPin">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold themed-text-muted mb-1.5">PIN</label>
+          <input type="password" inputmode="numeric" id="loginPin" required placeholder="Enter your PIN" class="w-full px-4 py-2.5 rounded-xl themed-input border focus:ring-2 focus:outline-none enter-nav" data-next="btnLoginSubmit">
+        </div>
+        <button type="submit" id="btnLoginSubmit" class="w-full bg-[#0066FF] dark:bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-blue-500/30 active:scale-[0.98] text-sm">
+          Sign In
+        </button>
+      </form>
+
+      <form id="formRegister" onsubmit="submitRegister(event)" class="p-6 space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-semibold themed-text-muted mb-1.5">New Username</label>
+          <input type="text" id="regUsername" required placeholder="Choose a username" class="w-full px-4 py-2.5 rounded-xl themed-input border focus:ring-2 focus:outline-none enter-nav" data-next="regPin">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold themed-text-muted mb-1.5">Create PIN</label>
+          <input type="password" inputmode="numeric" id="regPin" required placeholder="Set security PIN" class="w-full px-4 py-2.5 rounded-xl themed-input border focus:ring-2 focus:outline-none enter-nav" data-next="test_load_bench">
+        </div>
+
+        <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+          <div class="themed-subcard p-3.5 rounded-xl border mb-3">
+            <h4 class="font-bold text-xs sm:text-sm flex items-center gap-2 text-blue-600 dark:text-blue-400">
+              <i data-lucide="clipboard-check" class="w-4 h-4"></i> Baseline Load Assessment
+            </h4>
+            <p class="text-[11px] themed-text-muted mt-1">Perform a trial set for the exercises below to determine your initial baseline working load.</p>
+          </div>
+
+          <div class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar p-1">
+            <div class="themed-subcard p-3 rounded-xl border space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="font-semibold">Barbell Bench Press</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">Load (kg)</label>
+                  <input type="number" inputmode="decimal" step="0.1" id="test_load_bench" placeholder="20" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_reps_bench">
+                </div>
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">Reps</label>
+                  <input type="number" inputmode="numeric" step="1" id="test_reps_bench" placeholder="6-8" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_rpe_bench">
+                </div>
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">RPE</label>
+                  <input type="number" inputmode="decimal" step="0.1" id="test_rpe_bench" placeholder="1-10" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_load_squat">
+                </div>
+              </div>
+            </div>
+
+            <div class="themed-subcard p-3 rounded-xl border space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="font-semibold">Barbell Squats</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">Load (kg)</label>
+                  <input type="number" inputmode="decimal" step="0.1" id="test_load_squat" placeholder="20" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_reps_squat">
+                </div>
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">Reps</label>
+                  <input type="number" inputmode="numeric" step="1" id="test_reps_squat" placeholder="6-8" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_rpe_squat">
+                </div>
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">RPE</label>
+                  <input type="number" inputmode="decimal" step="0.1" id="test_rpe_squat" placeholder="1-10" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_load_lat">
+                </div>
+              </div>
+            </div>
+
+            <div class="themed-subcard p-3 rounded-xl border space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="font-semibold">Dumbbell Lateral Raises</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">Load (kg)</label>
+                  <input type="number" inputmode="decimal" step="0.1" id="test_load_lat" placeholder="5" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_reps_lat">
+                </div>
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">Reps</label>
+                  <input type="number" inputmode="numeric" step="1" id="test_reps_lat" placeholder="8-10" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_rpe_lat">
+                </div>
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">RPE</label>
+                  <input type="number" inputmode="decimal" step="0.1" id="test_rpe_lat" placeholder="1-10" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="btnRegisterSubmit">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="btnRegisterSubmit" class="w-full bg-[#0066FF] dark:bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-blue-500/30 active:scale-[0.98] text-sm">
+          Submit & Request Account
+        </button>
+      </form>
+    </div>
+
+    <div id="appSection" class="hidden space-y-4 md:space-y-6 w-full max-w-full">
+      <div class="themed-card rounded-2xl shadow-xl overflow-hidden w-full">
+        
+        <div id="tabWorkout" class="p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6 w-full max-w-full">
+          <form id="formWorkout" onsubmit="addOrUpdateWorkout(event)" class="themed-subcard p-4 sm:p-5 md:p-6 rounded-2xl border space-y-4 transition-all w-full">
+            <div class="flex justify-between items-center flex-wrap gap-2">
+              <h3 class="font-bold text-xs sm:text-sm flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i> Log / Edit Exercise Record
+              </h3>
+              <span id="todayBadge" class="hidden text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30 flex items-center gap-1.5 shadow-sm uppercase">
+                <i data-lucide="calendar" class="w-3.5 h-3.5"></i> Today's Session
+              </span>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 sm:gap-4">
+              <div>
+                <label class="block text-xs font-semibold themed-text-muted mb-1.5">Week Number</label>
+                <div class="flex items-center">
+                  <span class="bg-gray-200 dark:bg-slate-700 px-3 py-2 rounded-l-xl text-sm font-semibold border border-r-0 border-gray-300 dark:border-slate-600">Week</span>
+                  <input type="number" inputmode="numeric" step="1" id="inputProject" min="" value="" placeholder="" oninput="checkFormActivation(); changeProjectFreetext();" class="w-full px-3 py-2 themed-input rounded-r-xl border text-sm font-semibold focus:ring-2 focus:outline-none enter-nav" data-next="inputBodyWeight">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold themed-text-muted mb-1.5">Body Weight (kg)</label>
+                <input type="number" inputmode="decimal" step="0.1" id="inputBodyWeight" value="" placeholder="" disabled oninput="calculateLoadDetails(); checkFormActivation();" class="w-full px-3 py-2 themed-input rounded-xl border text-sm focus:ring-2 focus:outline-none enter-nav opacity-50 cursor-not-allowed" data-next="inputDaySession">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold themed-text-muted mb-1.5">Training Session</label>
+                <select id="inputDaySession" onchange="onSessionChange(this.value)" required class="w-full px-3 py-2 themed-input rounded-xl border text-sm focus:ring-2 focus:outline-none enter-nav" data-next="inputExercise">
+                  <option value="">-- Select Session --</option>
+                  <option value="Mon - Upper A">Mon - Upper A</option>
+                  <option value="Tue - Lower A">Tue - Lower A</option>
+                  <option value="Thu - Upper B">Thu - Upper B</option>
+                  <option value="Fri - Lower B">Fri - Lower B</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold themed-text-muted mb-1.5">Exercise Name</label>
+                <select id="inputExercise" onchange="onExerciseSelect(this.value)" required class="w-full px-3 py-2 themed-input rounded-xl border text-sm focus:ring-2 focus:outline-none enter-nav" data-next="inputWorkingLoad">
+                  <option value="">-- Select Session First --</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold themed-text-muted mb-1.5">Target Rep Range</label>
+                <input type="text" id="inputTargetReps" readonly required class="w-full px-3 py-2 themed-input opacity-75 rounded-xl border text-sm font-semibold focus:outline-none cursor-not-allowed">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold themed-text-muted mb-1.5">Rest Interval Target</label>
+                <input type="text" id="inputRestTime" readonly class="w-full px-3 py-2 themed-input opacity-75 rounded-xl border text-sm font-semibold focus:outline-none cursor-not-allowed">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 items-start">
+              <div>
+                <label class="block text-xs font-semibold themed-text-muted mb-1.5">
+                  Primary Working Load (kg)
+                  <span class="text-[10px] font-normal text-blue-600 dark:text-blue-400 block">*Auto-calculated / Custom load editable</span>
+                </label>
+                <input type="number" inputmode="decimal" step="0.1" id="inputWorkingLoad" oninput="onManualWorkingLoadInput()" placeholder="" required class="w-full px-3 py-2 themed-input rounded-xl border text-sm font-bold focus:ring-2 focus:outline-none enter-nav" data-next="inputSet1">
+              </div>
+
+              <div id="warmupContainer" class="themed-subcard p-3 rounded-xl border text-xs space-y-1">
+                <span class="font-semibold block mb-1 text-[11px] text-blue-600 dark:text-blue-400">Warm-up Sets:</span>
+                <div class="grid grid-cols-2 gap-1 text-[11px] font-medium" id="warmupPreview">
+                  <div class="themed-input p-1.5 rounded-lg border">Set 1: -</div>
+                  <div class="themed-input p-1.5 rounded-lg border">Set 2: -</div>
+                  <div class="themed-input p-1.5 rounded-lg border">Set 3: -</div>
+                  <div class="themed-input p-1.5 rounded-lg border">Set 4: -</div>
+                </div>
+              </div>
+
+              <div class="themed-subcard p-3 rounded-xl border text-xs space-y-1">
+                <span class="font-semibold block mb-1 text-[11px] text-blue-600 dark:text-blue-400">Side Load Calculation:</span>
+                <div class="font-bold text-sm" id="sideLoadDisplay">- kg / side</div>
+                <span class="text-[10px] themed-text-muted block" id="sideLoadFormulaNotice">*Calculated automatically based on implement type</span>
+              </div>
+            </div>
+
+            <div id="autoRegNotice" class="hidden bg-amber-100 border border-amber-300 text-amber-800 dark:bg-amber-950/80 dark:border-amber-600/60 dark:text-amber-200 px-4 py-2.5 rounded-xl text-xs font-medium flex items-center gap-2 shadow-sm">
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0"></i>
+              <span id="autoRegText">Target rep threshold not met. Working load automatically deloaded.</span>
+            </div>
+
+            <div id="timerWidget" class="hidden bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 p-3 rounded-xl flex items-center justify-between text-xs font-semibold text-blue-700 dark:text-blue-300">
+              <div class="flex items-center gap-2">
+                <i data-lucide="timer" class="w-4 h-4 animate-pulse"></i>
+                <span id="timerLabel">Rest Interval Active:</span>
+              </div>
+              <span id="timerCountdown" class="text-sm font-mono font-bold">05:00</span>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold themed-text-muted mb-2">Actual Reps Completed Per Set:</label>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                <div id="containerSet1">
+                  <span id="labelSet1" class="text-xs font-medium themed-text-muted block mb-1">Set 1</span>
+                  <input type="number" inputmode="numeric" step="1" id="inputSet1" min="0" onchange="checkAutoRegulation()" onblur="handleSetInputBlur(1)" placeholder="" class="w-full px-3 py-2 themed-input rounded-xl border text-center text-sm font-bold focus:ring-2 focus:outline-none enter-nav" data-next="inputSet2">
+                </div>
+                <div id="containerSet2">
+                  <span id="labelSet2" class="text-xs font-medium themed-text-muted block mb-1">Set 2</span>
+                  <input type="number" inputmode="numeric" step="1" id="inputSet2" min="0" onchange="checkAutoRegulation()" onblur="handleSetInputBlur(2)" placeholder="" class="w-full px-3 py-2 themed-input rounded-xl border text-center text-sm font-bold focus:ring-2 focus:outline-none enter-nav" data-next="inputSet3">
+                </div>
+                <div id="containerSet3">
+                  <span id="labelSet3" class="text-xs font-medium themed-text-muted block mb-1">Set 3</span>
+                  <input type="number" inputmode="numeric" step="1" id="inputSet3" min="0" onchange="checkAutoRegulation()" onblur="handleSetInputBlur(3)" placeholder="" class="w-full px-3 py-2 themed-input rounded-xl border text-center text-sm font-bold focus:ring-2 focus:outline-none enter-nav" data-next="inputSet4">
+                </div>
+                <div id="containerSet4">
+                  <span id="labelSet4" class="text-xs font-medium themed-text-muted block mb-1">Set 4</span>
+                  <input type="number" inputmode="numeric" step="1" id="inputSet4" min="0" onchange="checkAutoRegulation()" onblur="handleSetInputBlur(4)" placeholder="" class="w-full px-3 py-2 themed-input rounded-xl border text-center text-sm font-bold focus:ring-2 focus:outline-none enter-nav" data-next="inputCatatan">
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold themed-text-muted mb-1">Execution Notes (Optional, e.g. "RPE 8.0")</label>
+              <input type="text" id="inputCatatan" placeholder="RPE, technical form, fatigue notes..." class="w-full px-3 py-2 themed-input rounded-xl border text-sm focus:ring-2 focus:outline-none enter-nav" data-next="btnSaveWorkout" data-optional="true">
+            </div>
+
+            <div class="flex justify-end items-center gap-2 pt-2">
+              <button type="button" onclick="resetForm()" class="px-4 py-2 text-xs font-semibold themed-text-muted hover:text-blue-600 transition active:scale-95">Reset</button>
+              <button type="submit" id="btnSaveWorkout" class="bg-[#0066FF] dark:bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl text-xs font-semibold transition shadow-lg shadow-blue-500/30 active:scale-95">
+                Save Exercise Record
+              </button>
+            </div>
+          </form>
+
+          <div class="relative themed-card border rounded-2xl shadow-xl overflow-hidden w-full max-w-full">
+            <div class="overflow-x-auto max-h-[500px] custom-scrollbar relative w-full">
+              <table class="w-full text-left text-sm min-w-[640px] border-collapse">
+                <thead class="themed-table-header text-xs font-semibold sticky top-0 z-10 shadow-sm border-b border-gray-200 dark:border-slate-800">
+                  <tr>
+                    <th class="px-4 py-3.5">Day / Session</th>
+                    <th class="px-4 py-3.5">Exercise</th>
+                    <th class="px-4 py-3.5 text-center">Target</th>
+                    <th class="px-4 py-3.5 text-right">Load (Side / Total)</th>
+                    <th class="px-4 py-3.5 text-center">Reps (Set 1-4)</th>
+                    <th class="px-4 py-3.5 text-right text-emerald-600 dark:text-emerald-400">Next Load (kg)</th>
+                    <th class="px-4 py-3.5 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="workoutTableBody" class="divide-y divide-gray-200 dark:divide-slate-800/60">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="tabAnalytics" class="p-4 md:p-6 space-y-6 hidden w-full max-w-full">
+          <div id="analyticsAlerts" class="space-y-3"></div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+            <div class="themed-subcard p-4 rounded-2xl border space-y-3 w-full">
+              <div class="flex justify-between items-center flex-wrap gap-2">
+                <h3 class="font-bold flex items-center gap-2 text-xs sm:text-sm text-blue-600 dark:text-blue-400">
+                  <i data-lucide="trending-up" class="w-4 h-4"></i> Module 1: Dynamic e1RM Progression
+                </h3>
+                <select id="analyticsExerciseFilter" onchange="renderAnalyticsDashboard()" class="text-xs themed-input border rounded-lg px-2.5 py-1.5 font-semibold focus:outline-none focus:ring-2">
+                  <option value="Barbell Bench Press">Barbell Bench Press</option>
+                  <option value="Incline DB Press">Incline DB Press</option>
+                  <option value="Chest-Supported Row">Chest-Supported Row</option>
+                  <option value="Lat Pulldown">Lat Pulldown</option>
+                  <option value="DB Lateral Raises">DB Lateral Raises</option>
+                  <option value="Triceps Rope Pushdown">Triceps Rope Pushdown</option>
+                  <option value="Incline Biceps Curl">Incline Biceps Curl</option>
+                  <option value="Barbell Squats">Barbell Squats</option>
+                  <option value="Romanian Deadlift">Romanian Deadlift</option>
+                  <option value="Leg Press">Leg Press</option>
+                  <option value="Lying Leg Curl">Lying Leg Curl</option>
+                  <option value="Standing Calf Raise">Standing Calf Raise</option>
+                  <option value="Overhead Cable Triceps Ext">Overhead Cable Triceps Ext</option>
+                  <option value="Hammer Curls">Hammer Curls</option>
+                  <option value="Bulgarian Split Squat">Bulgarian Split Squat</option>
+                  <option value="Leg Extension">Leg Extension</option>
+                  <option value="Seated Leg Curl">Seated Leg Curl</option>
+                  <option value="Cable Lateral Raises">Cable Lateral Raises</option>
+                </select>
+              </div>
+              <p class="text-[11px] themed-text-muted">Estimated 1RM trend tracked automatically per session over time.</p>
+              <div class="h-64 relative w-full">
+                <canvas id="chartE1RM"></canvas>
+              </div>
+            </div>
+
+            <div class="themed-subcard p-4 rounded-2xl border space-y-3 w-full">
+              <h3 class="font-bold flex items-center gap-2 text-xs sm:text-sm text-blue-600 dark:text-blue-400">
+                <i data-lucide="scale" class="w-4 h-4"></i> Module 2: Body Weight vs. Total Tonnage
+              </h3>
+              <p class="text-[11px] themed-text-muted">Body weight changes vs total training volume accumulated per week.</p>
+              <div class="h-64 relative w-full">
+                <canvas id="chartWeightTonnage"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwY4B4GisEreB6rG5A2XWjThNf97f6QY2M88pW-WlI1c48eK8w2s23B6X3_63_y-E5G/exec";
+
+    const DEFAULT_BASELINE_CONFIG = {
+      "Barbell Bench Press": 20,
+      "Barbell Squats": 20,
+      "Dumbbell Lateral Raises": 5
+    };
+
+    const SESSIONS_CONFIG = {
+      "Mon - Upper A": [
+        { name: "Barbell Bench Press", sets: 3, minRep: 6, maxRep: 8, rest: "3-5 mins", implement: "Barbell", barWeight: 20 },
+        { name: "Chest-Supported Row", sets: 3, minRep: 8, maxRep: 10, rest: "2-3 mins", implement: "Machine/Unilateral", barWeight: 0 },
+        { name: "Incline DB Press", sets: 3, minRep: 8, maxRep: 10, rest: "2-3 mins", implement: "Dumbbell", barWeight: 0 },
+        { name: "Lat Pulldown", sets: 3, minRep: 10, maxRep: 12, rest: "2-3 mins", implement: "Cable/Stack", barWeight: 0 },
+        { name: "DB Lateral Raises", sets: 4, minRep: 12, maxRep: 15, rest: "1.5-2 mins", implement: "Dumbbell", barWeight: 0 },
+        { name: "Triceps Rope Pushdown", sets: 3, minRep: 10, maxRep: 12, rest: "1.5-2 mins", implement: "Cable/Stack", barWeight: 0 },
+        { name: "Incline Biceps Curl", sets: 3, minRep: 10, maxRep: 12, rest: "1.5-2 mins", implement: "Dumbbell", barWeight: 0 }
+      ],
+      "Tue - Lower A": [
+        { name: "Barbell Squats", sets: 3, minRep: 6, maxRep: 8, rest: "3-5 mins", implement: "Barbell", barWeight: 20 },
+        { name: "Romanian Deadlift", sets: 3, minRep: 8, maxRep: 10, rest: "2-3 mins", implement: "Barbell", barWeight: 20 },
+        { name: "Leg Press", sets: 3, minRep: 10, maxRep: 12, rest: "2-3 mins", implement: "Machine/Unilateral", barWeight: 0 },
+        { name: "Lying Leg Curl", sets: 3, minRep: 10, maxRep: 12, rest: "2-3 mins", implement: "Cable/Stack", barWeight: 0 },
+        { name: "Standing Calf Raise", sets: 4, minRep: 12, maxRep: 15, rest: "1.5-2 mins", implement: "Machine/Unilateral", barWeight: 0 }
+      ],
+      "Thu - Upper B": [
+        { name: "Lat Pulldown", sets: 3, minRep: 8, maxRep: 10, rest: "2-3 mins", implement: "Cable/Stack", barWeight: 0 },
+        { name: "Incline DB Press", sets: 3, minRep: 6, maxRep: 8, rest: "2-3 mins", implement: "Dumbbell", barWeight: 0 },
+        { name: "Chest-Supported Row", sets: 3, minRep: 10, maxRep: 12, rest: "2-3 mins", implement: "Machine/Unilateral", barWeight: 0 },
+        { name: "Barbell Bench Press", sets: 3, minRep: 8, maxRep: 10, rest: "2-3 mins", implement: "Barbell", barWeight: 20 },
+        { name: "DB Lateral Raises", sets: 4, minRep: 12, maxRep: 15, rest: "1.5-2 mins", implement: "Dumbbell", barWeight: 0 },
+        { name: "Overhead Cable Triceps Ext", sets: 3, minRep: 10, maxRep: 12, rest: "1.5-2 mins", implement: "Cable/Stack", barWeight: 0 },
+        { name: "Hammer Curls", sets: 3, minRep: 10, maxRep: 12, rest: "1.5-2 mins", implement: "Dumbbell", barWeight: 0 }
+      ],
+      "Fri - Lower B": [
+        { name: "Romanian Deadlift", sets: 3, minRep: 6, maxRep: 8, rest: "3-5 mins", implement: "Barbell", barWeight: 20 },
+        { name: "Bulgarian Split Squat", sets: 3, minRep: 8, maxRep: 10, rest: "2-3 mins", implement: "Dumbbell", barWeight: 0 },
+        { name: "Leg Extension", sets: 3, minRep: 10, maxRep: 12, rest: "2-3 mins", implement: "Machine/Unilateral", barWeight: 0 },
+        { name: "Seated Leg Curl", sets: 3, minRep: 10, maxRep: 12, rest: "2-3 mins", implement: "Cable/Stack", barWeight: 0 },
+        { name: "Cable Lateral Raises", sets: 4, minRep: 12, maxRep: 15, rest: "1.5-2 mins", implement: "Cable/Stack", barWeight: 0 },
+        { name: "Standing Calf Raise", sets: 4, minRep: 12, maxRep: 15, rest: "1.5-2 mins", implement: "Machine/Unilateral", barWeight: 0 }
+      ]
+    };
+
+    let currentUser = null;
+    let workoutData = [];
+    let editingIndex = null;
+    let isDeloaded = false;
+    let timerInterval = null;
+    let chartE1RMInstance = null;
+    let chartWeightTonnageInstance = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      setupEnterNavigation();
+      checkAuthSession();
+    });
+
+    function setupEnterNavigation() {
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          const target = e.target;
+          if (target && target.classList.contains("enter-nav")) {
+            const nextId = target.getAttribute("data-next");
+            if (nextId) {
+              const isOptional = target.getAttribute("data-optional") === "true";
+              if (!isOptional && !target.value.trim()) return;
+              e.preventDefault();
+              const nextEl = document.getElementById(nextId);
+              if (nextEl) {
+                nextEl.focus();
+                if (nextEl.tagName === "INPUT" || nextEl.tagName === "SELECT") {
+                  if (typeof nextEl.select === "function") nextEl.select();
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      let bg = "bg-gray-800 text-white";
+      if (type === "success") bg = "bg-emerald-600 text-white";
+      if (type === "error") bg = "bg-red-600 text-white";
+      if (type === "warning") bg = "bg-amber-600 text-white";
+
+      toast.className = `px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2 transition-all transform translate-y-2 opacity-0 pointer-events-auto ${bg}`;
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove("translate-y-2", "opacity-0");
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add("translate-y-2", "opacity-0");
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    function switchAuthTab(tab) {
+      const loginBtn = document.getElementById("tabLoginBtn");
+      const regBtn = document.getElementById("tabRegisterBtn");
+      const formLogin = document.getElementById("formLogin");
+      const formRegister = document.getElementById("formRegister");
+
+      if (tab === "login") {
+        loginBtn.className = "flex-1 py-3 px-2 font-bold text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 transition text-xs sm:text-sm text-center";
+        regBtn.className = "flex-1 py-3 px-2 font-bold themed-text-muted hover:text-blue-500 transition text-xs sm:text-sm text-center";
+        formLogin.classList.remove("hidden");
+        formRegister.classList.add("hidden");
+      } else {
+        regBtn.className = "flex-1 py-3 px-2 font-bold text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 transition text-xs sm:text-sm text-center";
+        loginBtn.className = "flex-1 py-3 px-2 font-bold themed-text-muted hover:text-blue-500 transition text-xs sm:text-sm text-center";
+        formRegister.classList.remove("hidden");
+        formLogin.classList.add("hidden");
+      }
+    }
+
+    function checkAuthSession() {
+      const savedUser = localStorage.getItem("coregrip_user");
+      if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        showAppUI();
+      } else {
+        showAuthUI();
+      }
+    }
+
+    function showAuthUI() {
+      document.getElementById("authSection").classList.remove("hidden");
+      document.getElementById("appSection").classList.add("hidden");
+      document.getElementById("headerNavTabs").classList.add("hidden");
+      document.getElementById("headerNavTabs").classList.remove("md:flex");
+      document.getElementById("syncStatus").classList.add("hidden");
+      document.getElementById("syncStatus").classList.remove("flex");
+      document.getElementById("mobileMenuBtn").classList.add("hidden");
+      document.getElementById("signOutBtnHeader").classList.add("hidden");
+      document.getElementById("signOutBtnHeader").classList.remove("flex");
+    }
+
+    function showAppUI() {
+      document.getElementById("authSection").classList.add("hidden");
+      document.getElementById("appSection").classList.remove("hidden");
+      document.getElementById("headerNavTabs").classList.remove("hidden");
+      document.getElementById("headerNavTabs").classList.add("md:flex");
+      document.getElementById("syncStatus").classList.remove("hidden");
+      document.getElementById("syncStatus").classList.add("flex");
+      document.getElementById("mobileMenuBtn").classList.remove("hidden");
+      document.getElementById("mobileMenuBtn").classList.add("md:hidden");
+      document.getElementById("signOutBtnHeader").classList.remove("hidden");
+      document.getElementById("signOutBtnHeader").classList.add("flex");
+
+      loadUserData();
+    }
+
+    async function submitLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById("loginUsername").value.trim().toLowerCase();
+      const pin = document.getElementById("loginPin").value.trim();
+
+      if (!username || !pin) {
+        showToast("Username and PIN are required.", "error");
+        return;
+      }
+
+      showToast("Signing in...", "info");
+
+      try {
+        const response = await fetch(`${GAS_WEB_APP_URL}?action=login&username=${encodeURIComponent(username)}&pin=${encodeURIComponent(pin)}`);
+        const result = await response.json();
+
+        if (result.status === "success") {
+          currentUser = { username: result.username, baseline: result.baseline || DEFAULT_BASELINE_CONFIG };
+          localStorage.setItem("coregrip_user", JSON.stringify(currentUser));
+          showToast(`Welcome back, ${result.username}!`, "success");
+          showAppUI();
+        } else {
+          showToast(result.message || "Invalid credentials.", "error");
+        }
+      } catch (err) {
+        showToast("Authentication failed. Please check connection.", "error");
+      }
+    }
+
+    async function submitRegister(e) {
+      e.preventDefault();
+      const username = document.getElementById("regUsername").value.trim().toLowerCase();
+      const pin = document.getElementById("regPin").value.trim();
+
+      const loadBench = parseFloat(document.getElementById("test_load_bench").value) || DEFAULT_BASELINE_CONFIG["Barbell Bench Press"];
+      const loadSquat = parseFloat(document.getElementById("test_load_squat").value) || DEFAULT_BASELINE_CONFIG["Barbell Squats"];
+      const loadLat = parseFloat(document.getElementById("test_load_lat").value) || DEFAULT_BASELINE_CONFIG["Dumbbell Lateral Raises"];
+
+      const baseline = {
+        "Barbell Bench Press": loadBench,
+        "Barbell Squats": loadSquat,
+        "Dumbbell Lateral Raises": loadLat
+      };
+
+      if (!username || !pin) {
+        showToast("Username and PIN are required.", "error");
+        return;
+      }
+
+      showToast("Registering user account...", "info");
+
+      try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "register",
+            username: username,
+            pin: pin,
+            baseline: baseline
+          })
+        });
+        const result = await response.json();
+
+        if (result.status === "success") {
+          currentUser = { username: result.username, baseline: baseline };
+          localStorage.setItem("coregrip_user", JSON.stringify(currentUser));
+          showToast("Account successfully registered!", "success");
+          showAppUI();
+        } else {
+          showToast(result.message || "Registration failed.", "error");
+        }
+      } catch (err) {
+        showToast("Registration error. Check network connection.", "error");
+      }
+    }
+
+    function handleLogout() {
+      localStorage.removeItem("coregrip_user");
+      currentUser = null;
+      workoutData = [];
+      showAuthUI();
+      showToast("Signed out successfully.", "info");
+    }
+
+    function toggleMobileDrawer(forceState) {
+      const drawer = document.getElementById("mobileDrawer");
+      if (typeof forceState === "boolean") {
+        if (forceState) drawer.classList.remove("hidden");
+        else drawer.classList.add("hidden");
+      } else {
+        drawer.classList.toggle("hidden");
+      }
+    }
+
+    function switchAppTab(tab) {
+      const workoutTab = document.getElementById("tabWorkout");
+      const analyticsTab = document.getElementById("tabAnalytics");
+      const navWorkoutBtn = document.getElementById("navWorkoutBtn");
+      const navAnalyticsBtn = document.getElementById("navAnalyticsBtn");
+      const mobileNavWorkoutBtn = document.getElementById("mobileNavWorkoutBtn");
+      const mobileNavAnalyticsBtn = document.getElementById("mobileNavAnalyticsBtn");
+
+      if (tab === "workout") {
+        workoutTab.classList.remove("hidden");
+        analyticsTab.classList.add("hidden");
+        
+        navWorkoutBtn.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition text-white bg-blue-600 flex items-center gap-2";
+        navAnalyticsBtn.className = "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition text-gray-300 hover:text-white hover:bg-white/10 flex items-center gap-2";
+
+        mobileNavWorkoutBtn.className = "w-full text-left px-4 py-2 text-xs font-bold rounded-lg text-white bg-blue-600 flex items-center gap-2";
+        mobileNavAnalyticsBtn.className = "w-full text-left px-4 py-2 text-xs font-semibold rounded-lg text-gray-300 hover:text-white hover:bg-white/10 flex items-center gap-2";
+      } else {
+        analyticsTab.classList.remove("hidden");
+        workoutTab.classList.add("hidden");
+
+        navAnalyticsBtn.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg transition text-white bg-blue-600 flex items-center gap-2";
+        navWorkoutBtn.className = "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition text-gray-300 hover:text-white hover:bg-white/10 flex items-center gap-2";
+
+        mobileNavAnalyticsBtn.className = "w-full text-left px-4 py-2 text-xs font-bold rounded-lg text-white bg-blue-600 flex items-center gap-2";
+        mobileNavWorkoutBtn.className = "w-full text-left px-4 py-2 text-xs font-semibold rounded-lg text-gray-300 hover:text-white hover:bg-white/10 flex items-center gap-2";
+
+        renderAnalyticsDashboard();
+      }
+    }
+
+    async function loadUserData() {
+      if (!currentUser) return;
+      showToast("Fetching user logs...", "info");
+
+      try {
+        const response = await fetch(`${GAS_WEB_APP_URL}?action=getWorkouts&username=${encodeURIComponent(currentUser.username)}`);
+        const result = await response.json();
+
+        if (result.status === "success") {
+          workoutData = result.data || [];
+          renderWorkoutTable();
+          showToast("Workout logs updated.", "success");
+        } else {
+          showToast("Failed to fetch logs.", "error");
+        }
+      } catch (err) {
+        showToast("Error loading user records.", "error");
+      }
+    }
+
+    function checkFormActivation() {
+      const projectVal = document.getElementById("inputProject").value.trim();
+      const bwInput = document.getElementById("inputBodyWeight");
+      const formInputs = document.querySelectorAll("#formWorkout select, #formWorkout input:not(#inputProject):not(#inputBodyWeight)");
+
+      if (projectVal !== "") {
+        bwInput.disabled = false;
+        bwInput.classList.remove("opacity-50", "cursor-not-allowed");
+
+        const bwVal = document.getElementById("inputBodyWeight").value.trim();
+        if (bwVal !== "") {
+          formInputs.forEach(el => el.disabled = false);
+        } else {
+          formInputs.forEach(el => {
+            if (el.id !== "inputTargetReps" && el.id !== "inputRestTime") {
+              el.disabled = true;
+            }
+          });
+        }
+      } else {
+        bwInput.disabled = true;
+        bwInput.classList.add("opacity-50", "cursor-not-allowed");
+        bwInput.value = "";
+        formInputs.forEach(el => {
+          if (el.id !== "inputTargetReps" && el.id !== "inputRestTime") {
+            el.disabled = true;
+          }
+        });
+      }
+    }
+
+    function changeProjectFreetext() {
+      renderWorkoutTable();
+    }
+
+    function onSessionChange(sessionName) {
+      const exerciseSelect = document.getElementById("inputExercise");
+      exerciseSelect.innerHTML = '<option value="">-- Select Exercise --</option>';
+
+      if (!sessionName || !SESSIONS_CONFIG[sessionName]) {
+        resetExerciseFields();
+        return;
+      }
+
+      SESSIONS_CONFIG[sessionName].forEach(ex => {
+        const opt = document.createElement("option");
+        opt.value = ex.name;
+        opt.textContent = ex.name;
+        exerciseSelect.appendChild(opt);
+      });
+
+      resetExerciseFields();
+    }
+
+    function onExerciseSelect(exerciseName) {
+      const sessionName = document.getElementById("inputDaySession").value;
+      if (!sessionName || !exerciseName) {
+        resetExerciseFields();
+        return;
+      }
+
+      const sessionList = SESSIONS_CONFIG[sessionName] || [];
+      const exConfig = sessionList.find(e => e.name === exerciseName);
+      if (!exConfig) return;
+
+      document.getElementById("inputTargetReps").value = `${exConfig.sets} sets x ${exConfig.minRep}-${exConfig.maxRep} reps`;
+      document.getElementById("inputRestTime").value = exConfig.rest;
+
+      configureSetInputsVisibility(exConfig.sets);
+
+      const calculatedLoad = computeAutoProgressionWorkingLoad(exerciseName);
+      document.getElementById("inputWorkingLoad").value = calculatedLoad;
+
+      calculateLoadDetails();
+    }
+
+    function configureSetInputsVisibility(numSets) {
+      for (let i = 1; i <= 4; i++) {
+        const container = document.getElementById(`containerSet${i}`);
+        const input = document.getElementById(`inputSet${i}`);
+        const label = document.getElementById(`labelSet${i}`);
+        if (i <= numSets) {
+          container.classList.remove("hidden");
+          input.required = true;
+          if (label) label.textContent = `Set ${i}`;
+        } else {
+          container.classList.add("hidden");
+          input.required = false;
+          input.value = "";
+        }
+      }
+    }
+
+    function resetExerciseFields() {
+      document.getElementById("inputTargetReps").value = "";
+      document.getElementById("inputRestTime").value = "";
+      document.getElementById("inputWorkingLoad").value = "";
+      document.getElementById("sideLoadDisplay").textContent = "- kg / side";
+      document.getElementById("sideLoadFormulaNotice").textContent = "*Calculated automatically based on implement type";
+      
+      const warmupPreview = document.getElementById("warmupPreview");
+      warmupPreview.innerHTML = `
+        <div class="themed-input p-1.5 rounded-lg border">Set 1: -</div>
+        <div class="themed-input p-1.5 rounded-lg border">Set 2: -</div>
+        <div class="themed-input p-1.5 rounded-lg border">Set 3: -</div>
+        <div class="themed-input p-1.5 rounded-lg border">Set 4: -</div>
+      `;
+
+      configureSetInputsVisibility(4);
+    }
+
+    function computeAutoProgressionWorkingLoad(exerciseName) {
+      const userLogs = workoutData.filter(d => d.exercise === exerciseName);
+      if (userLogs.length === 0) {
+        if (currentUser && currentUser.baseline && currentUser.baseline[exerciseName]) {
+          return currentUser.baseline[exerciseName];
+        }
+        return DEFAULT_BASELINE_CONFIG[exerciseName] || 20;
+      }
+
+      userLogs.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+      const lastLog = userLogs[userLogs.length - 1];
+
+      return lastLog.nextLoad || lastLog.workingLoad || 20;
+    }
+
+    function calculateLoadDetails() {
+      const sessionName = document.getElementById("inputDaySession").value;
+      const exerciseName = document.getElementById("inputExercise").value;
+      const loadVal = parseFloat(document.getElementById("inputWorkingLoad").value) || 0;
+
+      if (!sessionName || !exerciseName) return;
+
+      const sessionList = SESSIONS_CONFIG[sessionName] || [];
+      const exConfig = sessionList.find(e => e.name === exerciseName);
+      if (!exConfig) return;
+
+      let sideLoadText = "- kg / side";
+      let formulaText = "*Calculated automatically based on implement type";
+
+      if (exConfig.implement === "Barbell") {
+        const sideLoad = Math.max(0, (loadVal - exConfig.barWeight) / 2);
+        sideLoadText = `${sideLoad.toFixed(1)} kg / side`;
+        formulaText = `*Formula: (Total Load [${loadVal}kg] - Bar [${exConfig.barWeight}kg]) / 2`;
+      } else if (exConfig.implement === "Dumbbell") {
+        const sideLoad = loadVal / 2;
+        sideLoadText = `${sideLoad.toFixed(1)} kg / DB`;
+        formulaText = `*Formula: Total Load [${loadVal}kg] / 2 dumbbells`;
+      } else if (exConfig.implement === "Machine/Unilateral" || exConfig.implement === "Cable/Stack") {
+        sideLoadText = `${loadVal.toFixed(1)} kg (Total Plate/Stack)`;
+        formulaText = `*Direct load setting on machine/cable stack`;
+      }
+
+      document.getElementById("sideLoadDisplay").textContent = sideLoadText;
+      document.getElementById("sideLoadFormulaNotice").textContent = formulaText;
+
+      calculateWarmupRamps(loadVal);
+    }
+
+    function calculateWarmupRamps(workingLoad) {
+      const warmupPreview = document.getElementById("warmupPreview");
+      if (workingLoad <= 0) {
+        warmupPreview.innerHTML = `
+          <div class="themed-input p-1.5 rounded-lg border">Set 1: -</div>
+          <div class="themed-input p-1.5 rounded-lg border">Set 2: -</div>
+          <div class="themed-input p-1.5 rounded-lg border">Set 3: -</div>
+          <div class="themed-input p-1.5 rounded-lg border">Set 4: -</div>
+        `;
+        return;
+      }
+
+      const w1 = (workingLoad * 0.4).toFixed(1);
+      const w2 = (workingLoad * 0.6).toFixed(1);
+      const w3 = (workingLoad * 0.8).toFixed(1);
+      const w4 = (workingLoad * 0.9).toFixed(1);
+
+      warmupPreview.innerHTML = `
+        <div class="themed-input p-1.5 rounded-lg border">Set 1 (40%): <b>${w1} kg</b> x 10</div>
+        <div class="themed-input p-1.5 rounded-lg border">Set 2 (60%): <b>${w2} kg</b> x 6</div>
+        <div class="themed-input p-1.5 rounded-lg border">Set 3 (80%): <b>${w3} kg</b> x 3</div>
+        <div class="themed-input p-1.5 rounded-lg border">Set 4 (90%): <b>${w4} kg</b> x 1</div>
+      `;
+    }
+
+    function onManualWorkingLoadInput() {
+      calculateLoadDetails();
+      checkAutoRegulation();
+    }
+
+    function checkAutoRegulation() {
+      const sessionName = document.getElementById("inputDaySession").value;
+      const exerciseName = document.getElementById("inputExercise").value;
+      if (!sessionName || !exerciseName) return;
+
+      const sessionList = SESSIONS_CONFIG[sessionName] || [];
+      const exConfig = sessionList.find(e => e.name === exerciseName);
+      if (!exConfig) return;
+
+      const numSets = exConfig.sets;
+      let totalRepsCompleted = 0;
+      let validSetsCount = 0;
+
+      for (let i = 1; i <= numSets; i++) {
+        const val = parseInt(document.getElementById(`inputSet${i}`).value);
+        if (!isNaN(val)) {
+          totalRepsCompleted += val;
+          validSetsCount++;
+        }
+      }
+
+      const autoRegNotice = document.getElementById("autoRegNotice");
+      const autoRegText = document.getElementById("autoRegText");
+
+      if (validSetsCount === numSets) {
+        const minTargetTotalReps = numSets * exConfig.minRep;
+        const maxTargetTotalReps = numSets * exConfig.maxRep;
+
+        if (totalRepsCompleted < minTargetTotalReps) {
+          isDeloaded = true;
+          autoRegNotice.classList.remove("hidden");
+          autoRegText.textContent = `Target rep threshold not met (${totalRepsCompleted}/${minTargetTotalReps} reps). Working load automatically deloaded by 5%.`;
+        } else {
+          isDeloaded = false;
+          autoRegNotice.classList.add("hidden");
+        }
+      } else {
+        autoRegNotice.classList.add("hidden");
+      }
+    }
+
+    function handleSetInputBlur(setNumber) {
+      const sessionName = document.getElementById("inputDaySession").value;
+      const exerciseName = document.getElementById("inputExercise").value;
+      if (!sessionName || !exerciseName) return;
+
+      const sessionList = SESSIONS_CONFIG[sessionName] || [];
+      const exConfig = sessionList.find(e => e.name === exerciseName);
+      if (!exConfig) return;
+
+      if (setNumber === exConfig.sets) {
+        startRestTimer(exConfig.rest);
+      }
+    }
+
+    function startRestTimer(restString) {
+      clearInterval(timerInterval);
+      const timerWidget = document.getElementById("timerWidget");
+      const timerCountdown = document.getElementById("timerCountdown");
+
+      let seconds = 120;
+      if (restString.includes("3-5")) seconds = 180;
+      else if (restString.includes("2-3")) seconds = 120;
+      else if (restString.includes("1.5-2")) seconds = 90;
+
+      timerWidget.classList.remove("hidden");
+
+      function updateDisplay() {
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = (seconds % 60).toString().padStart(2, '0');
+        timerCountdown.textContent = `${m}:${s}`;
+      }
+
+      updateDisplay();
+
+      timerInterval = setInterval(() => {
+        seconds--;
+        if (seconds <= 0) {
+          clearInterval(timerInterval);
+          timerWidget.classList.add("hidden");
+          showToast("Rest interval completed! Prepare for your next set.", "warning");
+        } else {
+          updateDisplay();
+        }
+      }, 1000);
+    }
+
+    async function addOrUpdateWorkout(e) {
+      e.preventDefault();
+
+      if (!currentUser) {
+        showToast("Session expired. Please sign in again.", "error");
+        return;
+      }
+
+      const weekNum = document.getElementById("inputProject").value.trim();
+      const bodyWeight = parseFloat(document.getElementById("inputBodyWeight").value);
+      const sessionName = document.getElementById("inputDaySession").value;
+      const exerciseName = document.getElementById("inputExercise").value;
+      const workingLoad = parseFloat(document.getElementById("inputWorkingLoad").value);
+      const notes = document.getElementById("inputCatatan").value.trim();
+
+      if (!weekNum || isNaN(bodyWeight) || !sessionName || !exerciseName || isNaN(workingLoad)) {
+        showToast("Please fill in all required workout fields.", "error");
+        return;
+      }
+
+      const sessionList = SESSIONS_CONFIG[sessionName] || [];
+      const exConfig = sessionList.find(e => e.name === exerciseName);
+      const numSets = exConfig ? exConfig.sets : 4;
+
+      const setsReps = [];
+      for (let i = 1; i <= numSets; i++) {
+        const rVal = parseInt(document.getElementById(`inputSet${i}`).value);
+        if (isNaN(rVal)) {
+          showToast(`Please enter reps for Set ${i}`, "error");
+          return;
+        }
+        setsReps.push(rVal);
+      }
+
+      let nextLoad = workingLoad;
+      const totalReps = setsReps.reduce((a, b) => a + b, 0);
+      const maxPossibleReps = numSets * exConfig.maxRep;
+      const minPossibleReps = numSets * exConfig.minRep;
+
+      if (totalReps >= maxPossibleReps) {
+        nextLoad = parseFloat((workingLoad + 2.5).toFixed(1));
+      } else if (totalReps < minPossibleReps) {
+        nextLoad = parseFloat((workingLoad * 0.95).toFixed(1));
+      }
+
+      const record = {
+        username: currentUser.username,
+        week: weekNum,
+        bodyWeight: bodyWeight,
+        session: sessionName,
+        exercise: exerciseName,
+        targetReps: exConfig ? `${exConfig.sets}x${exConfig.minRep}-${exConfig.maxRep}` : "",
+        workingLoad: workingLoad,
+        setsReps: setsReps.join(", "),
+        nextLoad: nextLoad,
+        notes: notes,
+        timestamp: new Date().toISOString()
+      };
+
+      showToast("Saving workout record...", "info");
+
+      try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "saveWorkout",
+            data: record
+          })
+        });
+        const result = await response.json();
+
+        if (result.status === "success") {
+          showToast("Workout record saved!", "success");
+          
+          if (editingIndex !== null) {
+            workoutData[editingIndex] = record;
+            editingIndex = null;
+          } else {
+            workoutData.push(record);
+          }
+
+          renderWorkoutTable();
+          
+          // Auto-advance logic
+          autoAdvanceExercise(sessionName, exerciseName, weekNum);
+        } else {
+          showToast("Failed to save record.", "error");
+        }
+      } catch (err) {
+        showToast("Error connecting to database.", "error");
+      }
+    }
+
+    function autoAdvanceExercise(currentSession, currentExercise, currentWeek) {
+      const sessionExercises = SESSIONS_CONFIG[currentSession] || [];
+      const currentIndex = sessionExercises.findIndex(e => e.name === currentExercise);
+
+      // Check exercises saved for this session in this week
+      const savedInSession = workoutData.filter(d => 
+        String(d.week) === String(currentWeek) && d.session === currentSession
+      );
+
+      const savedExerciseNames = savedInSession.map(d => d.exercise);
+      const allCompleted = sessionExercises.every(ex => savedExerciseNames.includes(ex.name));
+
+      if (allCompleted) {
+        showToast(`🎉 Outstanding! Session "${currentSession}" for Week ${currentWeek} is fully completed!`, "success");
+        resetForm();
+        return;
+      }
+
+      // Find next uncompleted exercise
+      let nextEx = null;
+      for (let i = currentIndex + 1; i < sessionExercises.length; i++) {
+        if (!savedExerciseNames.includes(sessionExercises[i].name)) {
+          nextEx = sessionExercises[i];
+          break;
+        }
+      }
+
+      if (!nextEx) {
+        for (let i = 0; i < currentIndex; i++) {
+          if (!savedExerciseNames.includes(sessionExercises[i].name)) {
+            nextEx = sessionExercises[i];
+            break;
+          }
+        }
+      }
+
+      if (nextEx) {
+        document.getElementById("inputExercise").value = nextEx.name;
+        onExerciseSelect(nextEx.name);
+        
+        // Clear set rep inputs and notes
+        for (let i = 1; i <= 4; i++) {
+          const input = document.getElementById(`inputSet${i}`);
+          if (input) input.value = "";
+        }
+        document.getElementById("inputCatatan").value = "";
+        
+        showToast(`Auto-advanced to next exercise: ${nextEx.name}`, "info");
+      } else {
+        resetForm();
+      }
+    }
+
+    function resetForm() {
+      editingIndex = null;
+      document.getElementById("formWorkout").reset();
+      document.getElementById("btnSaveWorkout").textContent = "Save Exercise Record";
+      document.getElementById("autoRegNotice").classList.add("hidden");
+      document.getElementById("timerWidget").classList.add("hidden");
+      clearInterval(timerInterval);
+      resetExerciseFields();
+      checkFormActivation();
+    }
+
+    function renderWorkoutTable() {
+      const tbody = document.getElementById("workoutTableBody");
+      const currentWeekVal = document.getElementById("inputProject").value.trim();
+
+      tbody.innerHTML = "";
+
+      if (!currentWeekVal) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="px-4 py-8 text-center text-xs themed-text-muted">
+              Enter Week Number and Body Weight above to display workout log entries.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      const filtered = workoutData.filter(d => String(d.week) === currentWeekVal);
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="px-4 py-8 text-center text-xs themed-text-muted">
+              No workout records found for Week ${currentWeekVal}.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      filtered.forEach((row, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-gray-50 dark:hover:bg-slate-800/50 transition";
+
+        const sessionConfig = SESSIONS_CONFIG[row.session] || [];
+        const exConfig = sessionConfig.find(e => e.name === row.exercise);
+        const barWeight = exConfig ? exConfig.barWeight : 0;
+        const implement = exConfig ? exConfig.implement : "";
+
+        let sideLoadStr = "-";
+        if (implement === "Barbell") {
+          const side = Math.max(0, (row.workingLoad - barWeight) / 2);
+          sideLoadStr = `${side.toFixed(1)}kg/side`;
+        } else if (implement === "Dumbbell") {
+          sideLoadStr = `${(row.workingLoad / 2).toFixed(1)}kg/DB`;
+        }
+
+        tr.innerHTML = `
+          <td class="px-4 py-3 text-xs font-semibold">${row.session}</td>
+          <td class="px-4 py-3 text-xs font-bold text-blue-600 dark:text-blue-400">${row.exercise}</td>
+          <td class="px-4 py-3 text-xs text-center themed-text-muted">${row.targetReps || "-"}</td>
+          <td class="px-4 py-3 text-xs text-right font-medium">
+            <span class="text-[10px] themed-text-muted block">(${sideLoadStr})</span>
+            <span class="font-bold text-sm">${row.workingLoad} kg</span>
+          </td>
+          <td class="px-4 py-3 text-xs text-center font-mono font-semibold">${row.setsReps}</td>
+          <td class="px-4 py-3 text-xs text-right font-bold text-emerald-600 dark:text-emerald-400">${row.nextLoad} kg</td>
+          <td class="px-4 py-3 text-xs text-center">
+            <button onclick="editWorkoutRecord(${workoutData.indexOf(row)})" class="text-blue-600 dark:text-blue-400 hover:underline font-semibold mr-2">Edit</button>
+            <button onclick="deleteWorkoutRecord(${workoutData.indexOf(row)})" class="text-red-500 hover:underline font-semibold">Delete</button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function editWorkoutRecord(originalIdx) {
+      const record = workoutData[originalIdx];
+      if (!record) return;
+
+      editingIndex = originalIdx;
+
+      document.getElementById("inputProject").value = record.week;
+      document.getElementById("inputBodyWeight").value = record.bodyWeight;
+      checkFormActivation();
+
+      document.getElementById("inputDaySession").value = record.session;
+      onSessionChange(record.session);
+
+      document.getElementById("inputExercise").value = record.exercise;
+      onExerciseSelect(record.exercise);
+
+      document.getElementById("inputWorkingLoad").value = record.workingLoad;
+      calculateLoadDetails();
+
+      const repsArr = record.setsReps.split(",").map(s => s.trim());
+      repsArr.forEach((r, i) => {
+        const inp = document.getElementById(`inputSet${i + 1}`);
+        if (inp) inp.value = r;
+      });
+
+      document.getElementById("inputCatatan").value = record.notes || "";
+      document.getElementById("btnSaveWorkout").textContent = "Update Exercise Record";
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function deleteWorkoutRecord(originalIdx) {
+      if (!confirm("Are you sure you want to delete this exercise record?")) return;
+
+      const record = workoutData[originalIdx];
+      showToast("Deleting record...", "info");
+
+      try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "deleteWorkout",
+            username: currentUser.username,
+            timestamp: record.timestamp
+          })
+        });
+        const result = await response.json();
+
+        if (result.status === "success") {
+          workoutData.splice(originalIdx, 1);
+          renderWorkoutTable();
+          showToast("Record deleted successfully.", "success");
+        } else {
+          showToast("Failed to delete record.", "error");
+        }
+      } catch (err) {
+        showToast("Error connecting to server.", "error");
+      }
+    }
+
+    function renderAnalyticsDashboard() {
+      const selectedEx = document.getElementById("analyticsExerciseFilter").value;
+      const exLogs = workoutData.filter(d => d.exercise === selectedEx);
+
+      exLogs.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+
+      const labelsE1RM = exLogs.map((d, idx) => `Sess ${idx + 1} (W${d.week})`);
+      const dataE1RM = exLogs.map(d => {
+        const repsArr = d.setsReps.split(",").map(s => parseInt(s.trim()) || 0);
+        const maxRep = Math.max(...repsArr, 0);
+        return parseFloat((d.workingLoad * (1 + maxRep / 30)).toFixed(1));
+      });
+
+      const ctx1 = document.getElementById("chartE1RM").getContext("2d");
+      if (chartE1RMInstance) chartE1RMInstance.destroy();
+
+      chartE1RMInstance = new Chart(ctx1, {
+        type: "line",
+        data: {
+          labels: labelsE1RM,
+          datasets: [{
+            label: `e1RM (kg) - ${selectedEx}`,
+            data: dataE1RM,
+            borderColor: "#0066FF",
+            backgroundColor: "rgba(0, 102, 255, 0.1)",
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true }
+          },
+          scales: {
+            y: { beginAtZero: false }
+          }
+        }
+      });
+
+      // Weekly tonnage & weight aggregation
+      const weekMap = {};
+      workoutData.forEach(d => {
+        const w = d.week;
+        if (!weekMap[w]) {
+          weekMap[w] = { totalTonnage: 0, bodyWeight: d.bodyWeight };
+        }
+        const repsArr = d.setsReps.split(",").map(s => parseInt(s.trim()) || 0);
+        const setTonnage = repsArr.reduce((acc, r) => acc + (r * d.workingLoad), 0);
+        weekMap[w].totalTonnage += setTonnage;
+      });
+
+      const sortedWeeks = Object.keys(weekMap).sort((a, b) => parseInt(a) - parseInt(b));
+      const labelsWeeks = sortedWeeks.map(w => `Week ${w}`);
+      const dataBW = sortedWeeks.map(w => weekMap[w].bodyWeight);
+      const dataTonnage = sortedWeeks.map(w => weekMap[w].totalTonnage);
+
+      const ctx2 = document.getElementById("chartWeightTonnage").getContext("2d");
+      if (chartWeightTonnageInstance) chartWeightTonnageInstance.destroy();
+
+      chartWeightTonnageInstance = new Chart(ctx2, {
+        type: "bar",
+        data: {
+          labels: labelsWeeks,
+          datasets: [
+            {
+              type: "line",
+              label: "Body Weight (kg)",
+              data: dataBW,
+              borderColor: "#10b981",
+              yAxisID: "yBW",
+              tension: 0.2
+            },
+            {
+              type: "bar",
+              label: "Total Tonnage (kg)",
+              data: dataTonnage,
+              backgroundColor: "rgba(59, 130, 246, 0.5)",
+              yAxisID: "yTonnage"
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            yBW: {
+              type: "linear",
+              position: "left",
+              title: { display: true, text: "Body Weight (kg)" }
+            },
+            yTonnage: {
+              type: "linear",
+              position: "right",
+              title: { display: true, text: "Tonnage (kg)" },
+              grid: { drawOnChartArea: false }
+            }
+          }
+        }
+      });
+    }
+
+    function showSyncDetailModal() {
+      showToast("All data synced with Google Apps Script backend.", "success");
+    }
+  </script>
+</body>
+</html>
