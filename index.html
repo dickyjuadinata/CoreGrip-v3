@@ -2157,25 +2157,50 @@ function createOperationId() {
       }
     }
 
-    function renderAdminUsers(usersMeta) {
-      const tbody = document.getElementById("adminUsersTable");
-      if (!tbody) return;
-      tbody.innerHTML = "";
+    function renderAdminUsers(usersList) {
+  const tbody = document.getElementById("adminUsersTable");
+  if (!tbody) return;
+  tbody.innerHTML = "";
 
-      usersMeta.forEach(u => {
-        const tr = document.createElement("tr");
-        tr.className = "border-b border-gray-200 dark:border-slate-800";
-        tr.innerHTML = `
-          <td class="p-3 font-bold">${u.username}</td>
-          <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${u.approved ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'}">${u.approved ? 'Approved' : 'Pending'}</span></td>
-          <td class="p-3 text-center space-x-2">
-            ${!u.approved ? `<button onclick="approveUser('${u.username}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition">Approve</button>` : ''}
-            <button onclick="viewUserDetail('${u.username}')" class="px-3 py-1 bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 rounded-lg text-xs font-semibold transition">View Stats</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
+  if (!usersList || usersList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-xs themed-text-muted">Tidak ada data pengguna.</td></tr>`;
+    return;
+  }
+
+  usersList.forEach((user, idx) => {
+    // 🔍 AMBIL NAMA USER DENGAN SAFE FALLBACK:
+    // Mengecek berbagai kemungkinan penamaan key dari Google Apps Script / Spreadsheet
+    const displayName = user.username || user.userName || user.name || user.users || user.user || "Unknown User";
+    const userStatus = user.status || user.Status || "Pending";
+
+    const tr = document.createElement("tr");
+    tr.className = "hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors";
+
+    tr.innerHTML = `
+      <td class="p-3 text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+        <div class="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black text-xs uppercase">
+          ${displayName.charAt(0)}
+        </div>
+        <span>${displayName}</span>
+      </td>
+      <td class="p-3 text-xs">
+        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${
+          userStatus.toLowerCase() === 'approved' || userStatus.toLowerCase() === 'active' 
+            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400' 
+            : 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-400'
+        }">
+          ${userStatus}
+        </span>
+      </td>
+      <td class="p-3 text-xs text-center">
+        <button onclick="viewUserDetail('${displayName}')" class="px-3 py-1 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
+          Detail
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
 
     function renderAdminLogs(logs) {
       const tbody = document.getElementById("adminLogsTable");
