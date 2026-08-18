@@ -751,6 +751,7 @@
       if (!form) return;
       const elements = form.querySelectorAll("select, input:not(#inputProject):not(#inputBodyWeight), button[type='submit']");
       const isEnabled = (weekVal !== "" && bwVal !== "");
+      updateWorkoutVisibility();
       elements.forEach(el => {
         if (el.id !== "inputProject" && el.id !== "inputBodyWeight") {
           el.disabled = !isEnabled;
@@ -763,23 +764,44 @@
       });
     }
 
+    function updateWorkoutVisibility() {
+      const weekVal = document.getElementById("inputProject")?.value.trim() || "";
+      const bwVal = document.getElementById("inputBodyWeight")?.value.trim() || "";
+      const unlocked = weekVal !== "" && bwVal !== "";
+      const tableCard = document.getElementById("workoutTableBody")?.closest(".relative.themed-card");
+      const form = document.getElementById("formWorkout");
+      if (form) form.classList.toggle("opacity-60", !unlocked);
+      if (tableCard) tableCard.classList.toggle("hidden", !unlocked);
+      let notice = document.getElementById("workoutUnlockNotice");
+      if (!notice && form?.parentElement) {
+        notice = document.createElement("div");
+        notice.id = "workoutUnlockNotice";
+        notice.className = "themed-subcard p-3 rounded-xl text-xs themed-text-muted border";
+        form.parentElement.insertBefore(notice, form);
+      }
+      if (notice) {
+        notice.textContent = unlocked ? "" : "Please select a Week Number and enter Body Weight to unlock the workout log.";
+        notice.classList.toggle("hidden", unlocked);
+      }
+    }
+
     function toggleMobileDrawer(forceState) {
       const drawer = document.getElementById("mobileDrawer");
       const menuBtn = document.getElementById("mobileMenuBtn");
       if (!drawer) return;
+      if (!document.body.classList.contains("authenticated")) {
+        drawer.classList.remove("is-open");
+        return;
+      }
 
       if (typeof forceState === 'boolean') {
-        if (forceState) {
-          drawer.classList.remove("hidden");
-        } else {
-          drawer.classList.add("hidden");
-        }
+        drawer.classList.toggle("is-open", forceState);
       } else {
-        drawer.classList.toggle("hidden");
+        drawer.classList.toggle("is-open");
       }
 
       if (menuBtn) {
-        const isHidden = drawer.classList.contains("hidden");
+        const isHidden = !drawer.classList.contains("is-open");
         menuBtn.innerHTML = `<i data-lucide="${isHidden ? 'menu' : 'x'}" class="w-5 h-5"></i>`;
         lucide.createIcons();
       }
@@ -854,37 +876,30 @@
     }
 
     function calculateNextWeekLoadQB13(exercise, targetRepsStr, currentLoad, repsArr, catatan) {
-      if (!targetRepsStr) return currentLoad;
+      if (!targetRepsStr || !targetRepsStr.includes("-")) return currentLoad;
+
       const parts = targetRepsStr.split("-").map(n => parseInt(n.trim(), 10));
-      const minTarget = parts[0] || 0;
-      const maxTarget = parts[1] || minTarget;
+      const minTarget = parts[0];
+      const maxTarget = parts[1];
+      if (!Number.isFinite(minTarget) || !Number.isFinite(maxTarget)) return currentLoad;
 
       const preset = exercisePresets[exercise];
-      const totalSets = preset ? preset.sets : 4;
-      const validReps = repsArr.slice(0, totalSets);
+      const targetSetsCount = preset ? (preset.sets || 4) : 4;
+      const activeReps = repsArr.slice(0, targetSetsCount);
+      const countReps = activeReps.filter(r => Number(r) > 0).length;
+      const minReps = countReps > 0 ? Math.min(...activeReps.filter(r => Number(r) > 0)) : 0;
 
-      let allReachedMax = validReps.every(r => r >= maxTarget);
-      let anyBelowMin = validReps.some(r => r < minTarget);
-
-      let nextLoad = currentLoad;
-      let step = 2.5;
-
-      if (allReachedMax) {
-        nextLoad = currentLoad + step;
-      } else if (anyBelowMin) {
-        nextLoad = Math.max(0, currentLoad - step);
+      if (countReps === targetSetsCount && minReps >= maxTarget) {
+        return mround2_5(currentLoad + 2.5);
       }
 
-      return mround2_5(nextLoad);
+      if (countReps > 0 && minReps < minTarget) {
+        return Math.floor((currentLoad * 0.925) / 2.5) * 2.5;
+      }
+
+      return currentLoad;
     }
 
-function createOperationId() {
-  return "CG_" +
-    Date.now().toString(36) +
-    "_" +
-    crypto.randomUUID().replace(/-/g, "");
-}
-    
     function showToast(message, type = "info", duration = 3000) {
       const container = document.getElementById("toastContainer");
       if (!container) return;
@@ -1100,7 +1115,7 @@ function createOperationId() {
         for (let i = 1; i <= 4; i++) {
           const lbl = document.getElementById(`labelSet${i}`);
           const inp = document.getElementById(`inputSet${i}`);
-          if (lbl) lbl.innerText = `Set ${i}${repLabel}`;
+          if (lbl) lbl.innerText = `Set ${i}`;
           if (inp) inp.placeholder = preset.reps || "0";
         }
 
@@ -1136,7 +1151,28 @@ function createOperationId() {
 
         let autoLoad = get4WeeksHistoryLoad(exVal, currentProject);
         originalBaseLoad = autoLoad;
-        document.getElementById("inputWorkingLoad").value = autoLoad;
+        document.getElementById("inputWorkingLoad").value = autoLoad > 0 ? autoLoad : "";
+
+        let baselineHint = document.getElementById("baselineLoadHint");
+        if (!baselineHint) {
+          const label = document.querySelector('#inputWorkingLoad')?.parentElement?.querySelector('label');
+          if (label) {
+            baselineHint = document.createElement("span");
+            baselineHint.id = "baselineLoadHint";
+            baselineHint.className = "text-[10px] font-medium text-emerald-600 dark:text-emerald-400 block mt-1";
+            label.appendChild(baselineHint);
+          }
+        }
+        const param = baselineLoadParameters[exVal];
+        if (baselineHint) {
+          if (param && autoLoad > 0 && /Week\s*1/i.test(currentProject || "Week 1")) {
+            baselineHint.textContent = `Initial recommendation: ${autoLoad} kg (${param.label}) — editable`;
+          } else if (param && autoLoad > 0) {
+            baselineHint.textContent = `Recommended load: ${autoLoad} kg — editable`;
+          } else {
+            baselineHint.textContent = "Enter your initial working load.";
+          }
+        }
 
         calculateLoadDetails();
       }
@@ -1152,8 +1188,10 @@ function createOperationId() {
     }
 
     function get4WeeksHistoryLoad(exerciseName, currentProj) {
-      const savedBenchmarks = JSON.parse(localStorage.getItem(`workout_benchmarks_${currentUser}`) || "{}");
-      const defaultLoad = savedBenchmarks[exerciseName] ?? (initialBenchmarkLoads[exerciseName] ?? 20);
+      const savedBenchmarks = userBaselines && Object.keys(userBaselines).length
+        ? userBaselines
+        : JSON.parse(localStorage.getItem(`workout_benchmarks_${currentUser}`) || "{}");
+      const defaultLoad = Number(savedBenchmarks[exerciseName] ?? 0);
 
       if (!currentProj) return defaultLoad;
       
@@ -1284,32 +1322,56 @@ function createOperationId() {
       }
     }
 
-    function first_set_assessment(exercise_type, trial_load, reps_performed, rpe_output) {
-      let initial_baseline = trial_load;
-      
-      if (exercise_type === "COMPOUND") {
-        if (reps_performed >= 6 && reps_performed <= 8) {
-          if (rpe_output <= 6.5) initial_baseline = trial_load * 1.05;
-          else if (rpe_output >= 7.0 && rpe_output <= 8.5) initial_baseline = trial_load;
-          else if (rpe_output >= 9.0) initial_baseline = trial_load * 0.95;
-        } else if (reps_performed > 8) {
-          initial_baseline = trial_load * 1.075;
-        } else {
-          initial_baseline = trial_load * 0.90;
-        }
-      } else if (exercise_type === "ISOLATION") {
-        if (reps_performed >= 8 && reps_performed <= 10) {
-          if (rpe_output <= 7.0) initial_baseline = trial_load + 2.5;
-          else if (rpe_output >= 7.5 && rpe_output <= 8.5) initial_baseline = trial_load;
-          else initial_baseline = trial_load - 2.5;
-        } else if (reps_performed > 10) {
-          initial_baseline = trial_load + 2.5;
-        } else {
-          initial_baseline = Math.max(0, trial_load - 2.5);
-        }
-      }
+    function first_set_assessment(trial_load, reps_performed) {
+      const load = Number(trial_load) || 0;
+      const reps = Number(reps_performed) || 0;
+      if (load <= 0 || reps <= 0) return 0;
+      const estimated1RM = load * (1 + reps / 30);
+      const baseline = estimated1RM * 0.75;
+      return Math.round(mround2_5(baseline) * 10) / 10;
+    }
 
-      return Math.round(mround2_5(initial_baseline) * 10) / 10;
+    // Initial-load recommendation parameters. The three assessed anchors are:
+    // Push = Bench Press, Pull = Bent-over Barbell Row, Legs = Squat.
+    // Ratios are centralized here so they can be tuned later without changing workflow logic.
+    const baselineLoadParameters = {
+      "Barbell Bench Press": { anchor: "PUSH", ratio: 1.00, label: "Push anchor" },
+      "Barbell Overhead Press": { anchor: "PUSH", ratio: 0.65, label: "60–70% of Bench Press" },
+      "Incline Dumbbell Press": { anchor: "PUSH", ratio: 0.75, label: "75% of Bench Press" },
+      "Seated Dumbbell Press": { anchor: "PUSH", ratio: 0.60, label: "60% of Bench Press" },
+      "Dumbbell Lateral Raises - A": { anchor: "PUSH", ratio: 0.12, label: "12% of Bench Press" },
+      "Dumbbell Lateral Raises - B": { anchor: "PUSH", ratio: 0.12, label: "12% of Bench Press" },
+      "Triceps Pressdowns (Cable)": { anchor: "PUSH", ratio: 0.30, label: "30% of Bench Press" },
+      "Cable Overhead Triceps Extension": { anchor: "PUSH", ratio: 0.30, label: "30% of Bench Press" },
+      "Barbell Squats": { anchor: "LEGS", ratio: 1.00, label: "Legs anchor" },
+      "Barbell Romanian Deadlifts": { anchor: "LEGS", ratio: 0.85, label: "85% of Squat" },
+      "Barbell Conventional Deadlift": { anchor: "LEGS", ratio: 1.15, label: "115% of Squat" },
+      "Dumbbell Bulgarian Split Squat": { anchor: "LEGS", ratio: 0.40, label: "40% of Squat" },
+      "Standing Barbell Calf Raises - A": { anchor: "LEGS", ratio: 0.50, label: "50% of Squat" },
+      "Standing Barbell Calf Raises - B": { anchor: "LEGS", ratio: 0.50, label: "50% of Squat" },
+      "Bent-over Barbell Row": { anchor: "PULL", ratio: 1.00, label: "Pull anchor" },
+      "Chest Supported Dumbbell Row": { anchor: "PULL", ratio: 0.95, label: "95% of Barbell Row" },
+      "Bodyweight Pull-Ups": { anchor: "PULL", ratio: 0.65, label: "65% of Barbell Row (editable)" },
+      "Dumbbell Hammer Curl": { anchor: "PULL", ratio: 0.25, label: "25% of Barbell Row" },
+      "Barbell Curl": { anchor: "PULL", ratio: 0.30, label: "30% of Barbell Row" },
+      "Face Pulls (Cable)": { anchor: "PULL", ratio: 0.25, label: "25% of Barbell Row" }
+    };
+
+    function buildBaselineRecommendations(anchors) {
+      const anchorLoads = {
+        PUSH: Number(anchors["Barbell Bench Press"] || 0),
+        PULL: Number(anchors["Bent-over Barbell Row"] || 0),
+        LEGS: Number(anchors["Barbell Squats"] || 0)
+      };
+      const result = {};
+      Object.keys(exercisePresets).forEach(exercise => {
+        const param = baselineLoadParameters[exercise];
+        const anchorLoad = param ? anchorLoads[param.anchor] : 0;
+        if (param && Number.isFinite(anchorLoad) && anchorLoad > 0) {
+          result[exercise] = Math.round(mround2_5(anchorLoad * param.ratio) * 10) / 10;
+        }
+      });
+      return result;
     }
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -1455,11 +1517,13 @@ function createOperationId() {
     }
 
     function registerServiceWorker() {
+      // sw.js is optional. Do not surface a console error when the file is not deployed.
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js').catch(err => {
-            console.log('ServiceWorker registration failed: ', err);
-          });
+          fetch('./sw.js', { method: 'HEAD' }).then(r => {
+            if (r.ok) return navigator.serviceWorker.register('./sw.js');
+            return null;
+          }).catch(() => null);
         });
       }
     }
@@ -1512,123 +1576,107 @@ function createOperationId() {
       }
     }
 
-    async function apiRequest(payload, options = {}) {
-      const body = Object.assign({}, payload);
-      const token = authToken || sessionStorage.getItem(AUTH_TOKEN_KEY);
-      if (token && body.action !== "login" && body.action !== "register") body.authToken = token;
+    function checkSession() {
+      const savedUser = localStorage.getItem("coregrip_current_user");
+      const savedIsAdmin = localStorage.getItem("coregrip_is_admin") === "true";
+      const savedToken = localStorage.getItem("coregrip_auth_token");
+      const savedProj = localStorage.getItem("coregrip_current_project");
 
-      try {
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(body) });
-        const data = await res.json();
-        if (data && (data.status === "AUTH_REQUIRED" || data.code === "AUTH_REQUIRED" || data.code === "SESSION_EXPIRED")) {
-          clearAuthState(false);
-          if (!options.silentAuthError) showModernAlert(data.message || "Your session has expired. Please sign in again.", "Session Expired", "lock");
-        }
-        return data;
-      } catch (err) {
-        if (options.throwNetworkError) throw err;
-        return { status: "network_error", message: err.toString() };
-      }
-    }
+      // Always start in the logged-out visual state. This prevents the desktop
+      // navigation, mobile drawer and header Sign Out button from appearing
+      // on the login/register page.
+      document.body.classList.remove("authenticated");
+      document.getElementById("headerNavTabs")?.classList.add("hidden");
+      document.getElementById("mobileDrawer")?.classList.remove("is-open");
+      document.getElementById("mobileMenuBtn")?.classList.remove("mobile-menu-btn");
+      document.getElementById("signOutBtnHeader")?.classList.add("hidden");
 
-    function setAuthState(user, admin, token) {
-      currentUser = user;
-      isAdmin = !!admin;
-      authToken = token || null;
-      if (authToken) sessionStorage.setItem(AUTH_TOKEN_KEY, authToken);
-      sessionStorage.setItem(AUTH_USER_KEY, currentUser || "");
-      sessionStorage.setItem(AUTH_ADMIN_KEY, String(isAdmin));
-    }
+      if (savedUser && savedToken) {
+        currentUser = savedUser;
+        isAdmin = savedIsAdmin;
+        authToken = savedToken;
+        currentProject = savedProj || "";
 
-    function clearAuthState(reload = true) {
-      authToken = null;
-      currentUser = null;
-      isAdmin = false;
-      sessionStorage.removeItem(AUTH_TOKEN_KEY);
-      sessionStorage.removeItem(AUTH_USER_KEY);
-      sessionStorage.removeItem(AUTH_ADMIN_KEY);
-      if (reload) location.reload();
-    }
+        document.body.classList.add("authenticated");
+        document.getElementById("authSection").classList.add("hidden");
+        document.getElementById("appSection").classList.remove("hidden");
+        document.getElementById("mobileMenuBtn").classList.add("mobile-menu-btn");
+        document.getElementById("syncStatus").style.display = "flex";
 
-    function showAuthenticatedShell() {
-      document.getElementById("authSection").classList.add("hidden");
-      document.getElementById("headerNavTabs").style.display = "flex";
-      document.getElementById("mobileMenuBtn").style.display = "block";
-      document.getElementById("signOutBtnHeader").style.display = "flex";
-      document.getElementById("syncStatus").style.display = "flex";
-      document.body.classList.add("authenticated");
-    }
-
-    async function checkSession() {
-      const savedToken = sessionStorage.getItem(AUTH_TOKEN_KEY);
-      const savedUser = sessionStorage.getItem(AUTH_USER_KEY);
-      if (!savedToken || !savedUser) {
-        clearAuthState(false);
-        return;
-      }
-
-      authToken = savedToken;
-      currentUser = savedUser;
-      isAdmin = sessionStorage.getItem(AUTH_ADMIN_KEY) === "true";
-      currentProject = localStorage.getItem("coregrip_current_project") || "Week 1";
-
-      showAuthenticatedShell();
-      showSpinner("Validating secure session...");
-
-      if (isAdmin) {
-        document.getElementById("adminSection").classList.remove("hidden");
-        document.getElementById("headerNavTabs").style.display = "none";
-        document.getElementById("tabWorkout").parentElement.parentElement.classList.add("hidden");
-        const result = await apiRequest({ action: "getAdminData", username: currentUser }, { silentAuthError: true });
-        hideSpinner();
-        if (result.status === "success") {
-          adminFetchedUsers = result.usersData || [];
-          renderAdminUsers(result.usersMeta || []);
-          renderAdminLogs(result.activityLogs || []);
-        } else if (result.status === "AUTH_REQUIRED" || result.code === "AUTH_REQUIRED") {
-          clearAuthState();
+        if (isAdmin) {
+          document.getElementById("adminSection").classList.remove("hidden");
+          document.getElementById("appSection").classList.add("hidden");
+          document.getElementById("headerNavTabs").classList.add("hidden");
+          document.getElementById("tabWorkout")?.parentElement?.parentElement?.classList.add("hidden");
+          loadAdminData();
         } else {
-          showModernAlert(result.message || "Unable to validate administrator session.", "Session Error", "alert-circle");
+          document.getElementById("adminSection").classList.add("hidden");
+          document.getElementById("appSection").classList.remove("hidden");
+          document.getElementById("tabWorkout")?.parentElement?.parentElement?.classList.remove("hidden");
+          initializeBlankWorkoutState();
         }
       } else {
-        document.getElementById("adminSection").classList.add("hidden");
-        document.getElementById("tabWorkout").parentElement.parentElement.classList.remove("hidden");
-        const result = await apiRequest({ action: "getUserProjects", username: currentUser }, { silentAuthError: true });
-        hideSpinner();
-        if (result.status === "success") {
-          loadUserProjectsAndData(result.projects || []);
-        } else if (result.status === "AUTH_REQUIRED" || result.code === "AUTH_REQUIRED") {
-          clearAuthState();
-        } else {
-          loadUserProjectsAndData([]);
-        }
+        localStorage.removeItem("coregrip_current_user");
+        localStorage.removeItem("coregrip_is_admin");
+        localStorage.removeItem("coregrip_current_project");
+        localStorage.removeItem("coregrip_auth_token");
+        document.getElementById("authSection")?.classList.remove("hidden");
+        document.getElementById("appSection")?.classList.add("hidden");
+        document.getElementById("adminSection")?.classList.add("hidden");
+        document.getElementById("syncStatus").style.display = "none";
       }
     }
 
-    async function submitLogin(e) {
+    function handleAuthFailure(res) {
+      if (!res || res.status !== "error") return false;
+      const code = String(res.code || "").toUpperCase();
+      if (["AUTH_REQUIRED", "AUTH_MISMATCH", "ADMIN_REQUIRED"].includes(code)) {
+        localStorage.removeItem("coregrip_auth_token");
+        authToken = null;
+        showModernAlert(res.message || "Your session has expired. Please sign in again.", "Authentication Required", "shield-alert");
+        return true;
+      }
+      return false;
+    }
+
+    function submitLogin(e) {
       e.preventDefault();
       const username = document.getElementById("loginUsername").value.trim();
       const pin = document.getElementById("loginPin").value.trim();
-      if (!username || !pin) return;
 
       showSpinner("Authenticating...");
-      try {
-        const res = await apiRequest({ action: "login", username, pin });
+
+      const payload = { action: "login", username, pin };
+
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(res => {
         hideSpinner();
-        if (res.status === "success" && res.authToken) {
-          setAuthState(res.username || username, !!res.isAdmin, res.authToken);
-          currentProject = "Week 1";
-          localStorage.setItem("coregrip_current_project", currentProject);
-          document.getElementById("loginPin").value = "";
-          showToast(res.message || "Sign-in successful.", "success", 2500);
-          await checkSession();
+        if (handleAuthFailure(res)) return;
+        if (res.status === "success") {
+          currentUser = res.username || username;
+          isAdmin = !!res.isAdmin;
+          authToken = res.authToken || null;
+          currentProject = "";
+
+          localStorage.setItem("coregrip_current_user", currentUser);
+          localStorage.setItem("coregrip_is_admin", isAdmin);
+          if (authToken) localStorage.setItem("coregrip_auth_token", authToken);
+          localStorage.removeItem("coregrip_current_project");
+
+          showToast(res.message, "success", 2500);
+          checkSession();
         } else {
-          showModernAlert(res.message || "Invalid username or PIN.", "Authentication Failed", "alert-circle");
+          showModernAlert(res.message, "Authentication Failed", "alert-circle");
         }
-      } catch (err) {
+      })
+      .catch(err => {
         hideSpinner();
         showModernAlert("Network error: " + err.toString(), "Connection Error", "alert-circle");
-      }
+      });
     }
 
     function submitRegister(e) {
@@ -1636,38 +1684,39 @@ function createOperationId() {
       const username = document.getElementById("regUsername").value.trim();
       const pin = document.getElementById("regPin").value.trim();
 
-      const loadBench = parseFloat(document.getElementById("test_load_bench").value) || 20;
-      const repsBench = parseInt(document.getElementById("test_reps_bench").value, 10) || 8;
-      const rpeBench = parseFloat(document.getElementById("test_rpe_bench").value) || 8;
+      const loadBench = parseFloat(document.getElementById("test_load_bench").value);
+      const repsBench = parseInt(document.getElementById("test_reps_bench").value, 10);
+      const loadPull = parseFloat(document.getElementById("test_load_pull").value);
+      const repsPull = parseInt(document.getElementById("test_reps_pull").value, 10);
+      const loadSquat = parseFloat(document.getElementById("test_load_squat").value);
+      const repsSquat = parseInt(document.getElementById("test_reps_squat").value, 10);
 
-      const loadSquat = parseFloat(document.getElementById("test_load_squat").value) || 20;
-      const repsSquat = parseInt(document.getElementById("test_reps_squat").value, 10) || 8;
-      const rpeSquat = parseFloat(document.getElementById("test_rpe_squat").value) || 8;
+      if (![loadBench, repsBench, loadPull, repsPull, loadSquat, repsSquat].every(Number.isFinite) ||
+          [loadBench, loadPull, loadSquat].some(v => v <= 0) || [repsBench, repsPull, repsSquat].some(v => v <= 0)) {
+        showModernAlert("Please enter a valid trial load and maximum repetitions for all three baseline exercises.", "Baseline Assessment Required", "alert-circle");
+        return;
+      }
 
-      const loadLat = parseFloat(document.getElementById("test_load_lat").value) || 5;
-      const repsLat = parseInt(document.getElementById("test_reps_lat").value, 10) || 10;
-      const rpeLat = parseFloat(document.getElementById("test_rpe_lat").value) || 8;
-
-      let benchBase = first_set_assessment("COMPOUND", loadBench, repsBench, rpeBench);
-      let squatBase = first_set_assessment("COMPOUND", loadSquat, repsSquat, rpeSquat);
-      let latBase = first_set_assessment("ISOLATION", loadLat, repsLat, rpeLat);
-
-      let userBenchmarks = {
-        "Barbell Bench Press": benchBase,
-        "Barbell Squats": squatBase,
-        "Dumbbell Lateral Raises - A": latBase,
-        "Dumbbell Lateral Raises - B": latBase
+      const anchorBaselines = {
+        "Barbell Bench Press": first_set_assessment(loadBench, repsBench),
+        "Bent-over Barbell Row": first_set_assessment(loadPull, repsPull),
+        "Barbell Squats": first_set_assessment(loadSquat, repsSquat)
       };
-
+      const userBenchmarks = buildBaselineRecommendations(anchorBaselines);
       localStorage.setItem(`workout_benchmarks_${username}`, JSON.stringify(userBenchmarks));
 
       showSpinner("Submitting registration...");
 
-      const payload = { action: "register", username, pin };
+      const payload = { action: "register", username, pin, baselines: userBenchmarks };
 
-      apiRequest(payload, { throwNetworkError: true })
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
       .then(res => {
         hideSpinner();
+        if (handleAuthFailure(res)) return;
         if (res.status === "success") {
           showModernAlert(res.message, "Registration Successful", "check-circle");
           switchAuthTab('login');
@@ -1681,504 +1730,265 @@ function createOperationId() {
       });
     }
 
-    function handleLogout() {
-      showModernConfirm("Are you sure you want to sign out?", "Sign Out", "log-out").then(async confirmed => {
-        if (!confirmed) return;
-        const token = authToken;
-        try { if (token) await apiRequest({ action: "logout", authToken: token }, { silentAuthError: true }); } catch (e) {}
-        clearAuthState();
+    function loadAdminData() {
+      showSpinner("Loading admin data...");
+      const payload = { action: "getAdminData", username: currentUser, authToken };
+
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(res => {
+        hideSpinner();
+        if (handleAuthFailure(res)) return;
+        if (res.status === "success") {
+          adminFetchedUsers = res.usersData || [];
+          renderAdminUsers(res.usersMeta || []);
+          renderAdminLogs(res.activityLogs || []);
+        } else {
+          showModernAlert(res.message, "Admin Error", "alert-circle");
+        }
+      })
+      .catch(err => {
+        hideSpinner();
+        showModernAlert("Failed to load admin data: " + err.toString(), "Connection Error", "alert-circle");
       });
     }
 
-    function loadUserProjectsAndData(projectsFromSession) {
-      showSpinner("Loading user workout data...");
-      const processProjects = (projects) => {
-        if (projects && projects.length > 0) {
-          let projectsList = projects;
-          localStorage.setItem("coregrip_current_project", currentProject);
-          loadProjectDataFromCloud(currentProject);
+    function renderAdminUsers(usersMeta) {
+      const tbody = document.getElementById("adminUsersTable");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      if (usersMeta.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center themed-text-muted">No registered users found.</td></tr>`;
+        return;
+      }
+
+      usersMeta.forEach(u => {
+        const tr = document.createElement("tr");
+        let statusBadge = u.status === "ACTIVE" 
+          ? `<span class="px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 rounded-full">ACTIVE</span>`
+          : `<span class="px-2.5 py-1 text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 rounded-full">PENDING</span>`;
+
+        let actionBtn = u.status === "PENDING"
+          ? `<button onclick="approveUser('${u.user}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm">Approve</button>`
+          : `<button onclick="viewUserDetail('${u.user}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm">View Profile</button>`;
+
+        tr.innerHTML = `
+          <td class="p-3 font-semibold">${u.user}</td>
+          <td class="p-3">${statusBadge}</td>
+          <td class="p-3 text-center space-x-2">
+            ${actionBtn}
+            <button onclick="deleteUser('${u.user}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-sm">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderAdminLogs(logs) {
+      const tbody = document.getElementById("adminLogsTable");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      if (logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center themed-text-muted">No activity logs recorded.</td></tr>`;
+        return;
+      }
+
+      logs.reverse().forEach(l => {
+        const tr = document.createElement("tr");
+        const timeFormatted = new Date(l.time).toLocaleString();
+        tr.innerHTML = `
+          <td class="p-2.5 themed-text-muted">${timeFormatted}</td>
+          <td class="p-2.5 font-semibold">${l.user}</td>
+          <td class="p-2.5">${l.activity}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function approveUser(targetUser) {
+      showSpinner(`Approving user ${targetUser}...`);
+      const payload = { action: "approveUser", targetUser: targetUser, adminUser: currentUser, authToken };
+
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(res => {
+        hideSpinner();
+        if (handleAuthFailure(res)) return;
+        if (res.status === "success") {
+          showToast(res.message, "success", 2500);
+          loadAdminData();
         } else {
-          loadProjectDataFromCloud(currentProject);
+          showModernAlert(res.message, "Approval Failed", "alert-circle");
         }
-      };
-      if (Array.isArray(projectsFromSession)) { processProjects(projectsFromSession); return; }
-      apiRequest({ action: "getUserProjects", username: currentUser }, { silentAuthError: true })
-        .then(res => {
-          if (res.status === "success") processProjects(res.projects || []);
-          else {
+      })
+      .catch(err => {
+        hideSpinner();
+        showModernAlert("Network error: " + err.toString(), "Connection Error", "alert-circle");
+      });
+    }
+
+    function deleteUser(targetUser) {
+      showModernConfirm(`Are you sure you want to delete user '${targetUser}' and all their data?`, "Delete User", "trash-2").then(confirmed => {
+        if (confirmed) {
+          showSpinner(`Deleting user ${targetUser}...`);
+          const payload = { action: "deleteUser", targetUser: targetUser, adminUser: currentUser, authToken };
+
+          fetch(API_URL, {
+            method: "POST",
+            body: JSON.stringify(payload)
+          })
+          .then(res => res.json())
+          .then(res => {
             hideSpinner();
-            if (res.status === "AUTH_REQUIRED" || res.code === "AUTH_REQUIRED") clearAuthState();
-          }
-        })
-        .catch(err => {
-          console.error("Failed to load user projects from cloud, loading local fallback:", err);
-          let localData = localStorage.getItem(`workout_data_${currentUser}_${currentProject}`);
-          if (localData) { workoutRows = JSON.parse(localData); renderWorkoutTable(); }
-          hideSpinner();
+            if (res.status === "success") {
+              showToast(res.message, "success", 2500);
+              loadAdminData();
+            } else {
+              showModernAlert(res.message, "Delete Failed", "alert-circle");
+            }
+          })
+          .catch(err => {
+            hideSpinner();
+            showModernAlert("Network error: " + err.toString(), "Connection Error", "alert-circle");
+          });
+        }
+      });
+    }
+
+    function viewUserDetail(username) {
+      const container = document.getElementById("adminUserDetailContainer");
+      const title = document.getElementById("userDetailTitle");
+      const overview = document.getElementById("userStatsOverview");
+      const benchmarksList = document.getElementById("userBenchmarksList");
+
+      container.classList.remove("hidden");
+      title.innerHTML = `<i data-lucide="user-check" class="w-4 h-4"></i> Profile & Stats: ${username}`;
+
+      let userEntries = adminFetchedUsers.filter(u => u.user.toLowerCase() === username.toLowerCase());
+      let totalProjects = userEntries.length;
+      let totalSetsLogged = 0;
+
+      userEntries.forEach(e => {
+        e.rows.forEach(r => {
+          if (r.set1_reps > 0) totalSetsLogged++;
+          if (r.set2_reps > 0) totalSetsLogged++;
+          if (r.set3_reps > 0) totalSetsLogged++;
+          if (r.set4_reps > 0) totalSetsLogged++;
         });
+      });
+
+      overview.innerHTML = `
+        <div class="themed-subcard p-3 rounded-xl border">
+          <span class="text-xs themed-text-muted block">Active Projects</span>
+          <span class="text-lg font-bold text-blue-600 dark:text-blue-400">${totalProjects}</span>
+        </div>
+        <div class="themed-subcard p-3 rounded-xl border">
+          <span class="text-xs themed-text-muted block">Total Sets Logged</span>
+          <span class="text-lg font-bold text-emerald-600 dark:text-emerald-400">${totalSetsLogged}</span>
+        </div>
+        <div class="themed-subcard p-3 rounded-xl border">
+          <span class="text-xs themed-text-muted block">Account Status</span>
+          <span class="text-lg font-bold">ACTIVE</span>
+        </div>
+      `;
+
+      let savedBenchmarks = JSON.parse(localStorage.getItem(`workout_benchmarks_${username}`) || "{}");
+      benchmarksList.innerHTML = "";
+
+      Object.keys(savedBenchmarks).forEach(ex => {
+        const div = document.createElement("div");
+        div.className = "themed-subcard p-2.5 rounded-xl border text-xs";
+        div.innerHTML = `<span class="themed-text-muted block text-[10px]">${ex}</span><b class="text-sm">${savedBenchmarks[ex]} kg</b>`;
+        benchmarksList.appendChild(div);
+      });
+
+      lucide.createIcons();
+      container.scrollIntoView({ behavior: 'smooth' });
     }
 
-function loadUserBaselines() {
-
-  if (
-    !currentUser ||
-    !authToken
-  ) {
-    return Promise.resolve({});
-  }
-
-
-  return fetch(
-    API_URL,
-    {
-
-      method:
-        "POST",
-
-      body:
-        JSON.stringify({
-
-          action:
-            "getBaselines",
-
-          username:
-            currentUser,
-
-          authToken:
-            authToken
-
-        })
-
-    }
-  )
-
-  .then(
-    function (res) {
-
-      return res.json();
-
-    }
-  )
-
-  .then(
-    function (res) {
-
-      if (
-        handleAuthFailure(res)
-      ) {
-
-        return {};
-
-      }
-
-
-      if (
-        res.status !==
-        "success"
-      ) {
-
-        console.warn(
-          "Baseline server load failed:",
-          res
-        );
-
-        return {};
-
-      }
-
-
-      var baselines =
-        res.baselines || {};
-
-
-      /*
-       * Server is authoritative.
-       */
-
-      userBaselines =
-        baselines;
-
-
-      localStorage.setItem(
-
-        `workout_benchmarks_${currentUser}`,
-
-        JSON.stringify(
-          baselines
-        )
-
-      );
-
-
-      return baselines;
-
-    }
-  )
-
-  .catch(
-    function (err) {
-
-      console.error(
-        "Baseline load failed:",
-        err
-      );
-
-
-      /*
-       * Offline fallback.
-       */
-
-      try {
-
-        var local =
-          JSON.parse(
-
-            localStorage.getItem(
-              `workout_benchmarks_${currentUser}`
-            ) || "{}"
-
-          );
-
-
-        userBaselines =
-          local;
-
-
-        return local;
-
-      } catch (e) {
-
-        userBaselines =
-          {};
-
-        return {};
-
-      }
-
-    }
-  );
-
-}    
-    
-    function loadProjectDataFromCloud(
-  proj
-) {
-
-  if (
-    !currentUser ||
-    !authToken
-  ) {
-    return;
-  }
-
-
-  var localKey =
-    `workout_data_${currentUser}_${proj}`;
-
-
-  var localRows = [];
-
-
-  /*
-   * Read local cache first.
-   */
-
-  var localRaw =
-    localStorage.getItem(
-      localKey
-    );
-
-
-  if (localRaw) {
-
-    try {
-
-      var parsed =
-        JSON.parse(
-          localRaw
-        );
-
-
-      if (
-        Array.isArray(parsed)
-      ) {
-
-        localRows =
-          parsed;
-
-      }
-
-    } catch (e) {
-
-      console.warn(
-        "Invalid local workout cache.",
-        e
-      );
-
+    function closeUserDetail() {
+      document.getElementById("adminUserDetailContainer").classList.add("hidden");
     }
 
-  }
+    window.loadAdminData = loadAdminData;
 
-
-  var payload = {
-
-    action:
-      "getData",
-
-    username:
-      currentUser,
-
-    project:
-      proj,
-
-    authToken:
-      authToken
-
-  };
-
-
-  fetch(
-    API_URL,
-    {
-
-      method:
-        "POST",
-
-      body:
-        JSON.stringify(
-          payload
-        )
-
+    function handleLogout() {
+      showModernConfirm("Are you sure you want to sign out?", "Sign Out", "log-out").then(confirmed => {
+        if (confirmed) {
+          localStorage.removeItem("coregrip_current_user");
+          localStorage.removeItem("coregrip_is_admin");
+          localStorage.removeItem("coregrip_current_project");
+          localStorage.removeItem("coregrip_auth_token");
+          authToken = null;
+          document.body.classList.remove("authenticated");
+          toggleMobileDrawer(false);
+          location.reload();
+        }
+      });
     }
-  )
 
-  .then(
-    function (res) {
-
-      return res.json();
-
+    function initializeBlankWorkoutState() {
+      currentProject = "";
+      workoutRows = [];
+      const weekInput = document.getElementById("inputProject");
+      const bwInput = document.getElementById("inputBodyWeight");
+      if (weekInput) weekInput.value = "";
+      if (bwInput) { bwInput.value = ""; bwInput.disabled = true; }
+      document.getElementById("workoutTableBody").innerHTML = "";
+      checkFormActivation();
+      updateWorkoutVisibility();
+      loadUserBaselines();
     }
-  )
 
-  .then(
-    function (res) {
-
-      hideSpinner();
-
-
-      if (
-        handleAuthFailure(res)
-      ) {
-
-        return;
-
-      }
-
-
-      if (
-        res.status !==
-        "success"
-      ) {
-
-        /*
-         * Server failed.
-         * Keep local.
-         */
-
-        workoutRows =
-          localRows;
-
-        renderWorkoutTable();
-
-        return;
-
-      }
-
-
-      var serverRows =
-        Array.isArray(
-          res.rows
-        )
-          ? res.rows
-          : [];
-
-
-      /*
-       * IMPORTANT:
-       *
-       * Empty server + non-empty local
-       * does NOT mean local data should
-       * be deleted.
-       */
-
-      if (
-        serverRows.length > 0
-      ) {
-
-        /*
-         * Server has authoritative data.
-         */
-
-        workoutRows =
-          serverRows;
-
-
-        localStorage.setItem(
-
-          localKey,
-
-          JSON.stringify(
-            workoutRows
-          )
-
-        );
-
-
-      } else if (
-        localRows.length > 0
-      ) {
-
-        /*
-         * Server empty but local has data.
-         *
-         * Keep local data and synchronize
-         * it back to server.
-         */
-
-        workoutRows =
-          localRows;
-
-
-        renderWorkoutTable();
-
-
-        syncDataToServer();
-
-
-        return;
-
-
-      } else {
-
-        workoutRows =
-          [];
-
-        localStorage.setItem(
-          localKey,
-          "[]"
-        );
-
-      }
-
-
-      renderWorkoutTable();
-
-
-      /*
-       * Update project list if available.
-       */
-
-      if (
-        Array.isArray(
-          res.projects
-        )
-      ) {
-
-        projects =
-          res.projects;
-
-      }
-
+    function loadUserBaselines() {
+      if (!currentUser || !authToken) return;
+      fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getBaselines", username: currentUser, authToken }) })
+        .then(res => res.json())
+        .then(res => { if (res.status === "success") { userBaselines = res.baselines || {}; localStorage.setItem(`workout_benchmarks_${currentUser}`, JSON.stringify(userBaselines)); } })
+        .catch(() => {});
     }
-  )
 
-  .catch(
-    function (err) {
+    function loadProjectDataFromCloud(proj) {
+      const payload = { action: "getData", username: currentUser, project: proj, authToken };
 
-      console.error(
-        "Unable to load workout data:",
-        err
-      );
-
-
-      hideSpinner();
-
-
-      /*
-       * Network failure:
-       * LOCAL remains source of truth
-       * until cloud is reachable.
-       */
-
-      workoutRows =
-        localRows;
-
-
-      renderWorkoutTable();
-
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(res => {
+        hideSpinner();
+        if (handleAuthFailure(res)) return;
+        if (res.status === "success") {
+          workoutRows = res.rows || [];
+          localStorage.setItem(`workout_data_${currentUser}_${proj}`, JSON.stringify(workoutRows));
+          renderWorkoutTable();
+        } else {
+          let localData = localStorage.getItem(`workout_data_${currentUser}_${proj}`);
+          if (localData) {
+            workoutRows = JSON.parse(localData);
+            renderWorkoutTable();
+          }
+        }
+      })
+      .catch(err => {
+        hideSpinner();
+        let localData = localStorage.getItem(`workout_data_${currentUser}_${proj}`);
+        if (localData) {
+          workoutRows = JSON.parse(localData);
+          renderWorkoutTable();
+        }
+      });
     }
-  );
 
-}
-
-function loadLocalWorkoutData(
-  proj
-) {
-
-  var key =
-    `workout_data_${currentUser}_${proj}`;
-
-
-  var raw =
-    localStorage.getItem(
-      key
-    );
-
-
-  if (!raw) {
-
-    workoutRows =
-      [];
-
-    renderWorkoutTable();
-
-    return;
-
-  }
-
-
-  try {
-
-    var rows =
-      JSON.parse(
-        raw
-      );
-
-
-    workoutRows =
-      Array.isArray(rows)
-        ? rows
-        : [];
-
-
-  } catch (e) {
-
-    console.error(
-      "Invalid local workout data:",
-      e
-    );
-
-
-    workoutRows =
-      [];
-
-  }
-
-
-  renderWorkoutTable();
-
-}
-    
     function renderWorkoutTable() {
       const tbody = document.getElementById("workoutTableBody");
       if (!tbody) return;
@@ -2304,6 +2114,30 @@ function loadLocalWorkoutData(
       });
     }
 
+    function advanceToNextExercise(sessionName, completedExercise) {
+      const sessionExercises = Object.keys(exercisePresets).filter(ex => exercisePresets[ex].session === sessionName);
+      const completedIndex = sessionExercises.indexOf(completedExercise);
+      if (completedIndex < 0) { resetForm(); return; }
+      const logged = new Set(workoutRows.filter(r => r.day_session === sessionName).map(r => r.exercise));
+      const next = sessionExercises.slice(completedIndex + 1).find(ex => !logged.has(ex));
+
+      if (next) {
+        resetForm();
+        document.getElementById("inputDaySession").value = sessionName;
+        onSessionChange(sessionName);
+        document.getElementById("inputExercise").value = next;
+        onExerciseSelect(next);
+        showToast(`Saved. Next exercise: ${next}`, "success", 3000);
+        document.getElementById("inputWorkingLoad")?.focus();
+      } else if (sessionExercises.every(ex => logged.has(ex))) {
+        resetForm();
+        showToast("Session completed! All exercises in this session are logged.", "success", 4500);
+        triggerPushNotification("CoreGrip — Session Completed", `All exercises in ${sessionName} have been logged.`);
+      } else {
+        resetForm();
+      }
+    }
+
     function addOrUpdateWorkout(e) {
       e.preventDefault();
 
@@ -2335,7 +2169,8 @@ function loadLocalWorkoutData(
         updated_at: Date.now()
       };
 
-      if (editIndex >= 0) {
+      const wasEditing = editIndex >= 0;
+      if (wasEditing) {
         workoutRows[editIndex] = newRecord;
         editIndex = -1;
         showToast("Exercise record updated successfully.", "success", 2000);
@@ -2347,11 +2182,22 @@ function loadLocalWorkoutData(
       localStorage.setItem(`workout_data_${currentUser}_${currentProject}`, JSON.stringify(workoutRows));
       renderWorkoutTable();
       syncDataToServer();
-      resetForm();
+
+      // Auto-advance applies only to a newly saved exercise.
+      // Existing records being edited should remain in edit mode behavior.
+      if (!wasEditing) {
+        advanceToNextExercise(daySession, exercise);
+      } else {
+        resetForm();
+      }
     }
 
     function resetForm() {
+      const weekValue = document.getElementById("inputProject")?.value || "";
+      const bodyWeightValue = document.getElementById("inputBodyWeight")?.value || "";
       document.getElementById("formWorkout").reset();
+      document.getElementById("inputProject").value = weekValue;
+      document.getElementById("inputBodyWeight").value = bodyWeightValue;
       document.getElementById("inputExercise").innerHTML = '<option value="">-- Select Session First --</option>';
       document.getElementById("inputTargetReps").value = "";
       document.getElementById("inputRestTime").value = "";
@@ -2366,186 +2212,38 @@ function loadLocalWorkoutData(
     }
 
     function syncDataToServer() {
-
-  if (
-    !currentUser ||
-    !authToken ||
-    !currentProject
-  ) {
-    return;
-  }
-
-
-  /*
-   * ALWAYS save local first.
-   */
-
-  localStorage.setItem(
-
-    `workout_data_${currentUser}_${currentProject}`,
-
-    JSON.stringify(
-      workoutRows
-    )
-
-  );
-
-
-  /*
-   * Offline mode.
-   */
-
-  if (!navigator.onLine) {
-
-    pendingQueueCount++;
-
-    updateOnlineStatus();
-
-    return;
-
-  }
-
-
-  var operationId =
-    createOperationId();
-
-
-  var payload = {
-
-    action:
-      "saveData",
-
-    username:
-      currentUser,
-
-    authToken:
-      authToken,
-
-    project:
-      currentProject,
-
-    rows:
-      workoutRows,
-
-    operationId:
-      operationId
-
-  };
-
-
-  fetch(
-    API_URL,
-    {
-
-      method:
-        "POST",
-
-      body:
-        JSON.stringify(
-          payload
-        )
-
-    }
-  )
-
-  .then(
-    function (res) {
-
-      return res.json();
-
-    }
-  )
-
-  .then(
-    function (res) {
-
-      if (
-        handleAuthFailure(res)
-      ) {
-
-        return;
-
-      }
-
-
-      if (
-        res.status ===
-        "success"
-      ) {
-
-        lastSyncedTime =
-          new Date();
-
-        pendingQueueCount =
-          0;
-
-        updateOnlineStatus();
-
-
-        /*
-         * Keep exact local snapshot.
-         */
-
-        localStorage.setItem(
-
-          `workout_data_${currentUser}_${currentProject}`,
-
-          JSON.stringify(
-            workoutRows
-          )
-
-        );
-
-
-        showToast(
-
-          "Workout synchronized successfully.",
-
-          "success",
-
-          1500
-
-        );
-
-
-      } else {
-
-        console.error(
-          "Workout synchronization rejected:",
-          res
-        );
-
-
+      if (!navigator.onLine) {
         pendingQueueCount++;
-
         updateOnlineStatus();
-
+        return;
       }
 
+      const payload = {
+        action: "saveData",
+        username: currentUser,
+        authToken: authToken,
+        project: currentProject,
+        rows: workoutRows
+      };
+
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === "success") {
+          lastSyncedTime = new Date();
+          pendingQueueCount = 0;
+          updateOnlineStatus();
+        }
+      })
+      .catch(err => {
+        console.error("Cloud sync failed:", err);
+        pendingQueueCount++;
+        updateOnlineStatus();
+      });
     }
-  )
-
-  .catch(
-    function (err) {
-
-      console.error(
-        "Cloud sync failed:",
-        err
-      );
-
-
-      /*
-       * DO NOT erase local data.
-       */
-
-      pendingQueueCount++;
-
-      updateOnlineStatus();
-
-    }
-  );
-
-}
 
     function changeProjectFreetext() {
       const weekNum = document.getElementById("inputProject").value.trim();
@@ -2568,90 +2266,51 @@ function loadLocalWorkoutData(
     let chartMuscleDistributionInstance = null;
     let chartACWRInstance = null;
 
+    function getHistoricalWeekRows() {
+      const result = [];
+      for (let i = 1; i <= 52; i++) {
+        const key = `workout_data_${currentUser}_Week ${i}`;
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        try {
+          const rows = JSON.parse(raw);
+          if (Array.isArray(rows) && rows.length) result.push({ week: i, rows });
+        } catch (e) {}
+      }
+      return result;
+    }
+
     function renderE1RMChart() {
       const ctx = document.getElementById('chartE1RM').getContext('2d');
       if (chartE1RMInstance) chartE1RMInstance.destroy();
-
       const exerciseFilter = document.getElementById("analyticsExerciseFilter").value;
-      let labels = ["Week 1", "Week 2", "Week 3", "Week 4"];
-      let dataPoints = [0, 0, 0, 0];
-
-      for (let i = 1; i <= 4; i++) {
-        let projName = `Week ${i}`;
-        let localData = localStorage.getItem(`workout_data_${currentUser}_${projName}`);
-        if (localData) {
-          let rows = JSON.parse(localData);
-          let match = rows.find(r => r.exercise === exerciseFilter);
-          if (match) {
-            let maxReps = Math.max(match.set1_reps, match.set2_reps, match.set3_reps, match.set4_reps);
-            if (maxReps > 0 && match.working_load > 0) {
-              let e1rm = match.working_load * (1 + (maxReps / 30));
-              dataPoints[i - 1] = Math.round(e1rm * 10) / 10;
-            }
-          }
-        }
-      }
-
+      const points = [];
+      getHistoricalWeekRows().forEach(({ week, rows }) => {
+        const match = rows.find(r => r.exercise === exerciseFilter && Number(r.working_load) > 0);
+        if (!match) return;
+        const reps = [match.set1_reps, match.set2_reps, match.set3_reps, match.set4_reps].map(Number).filter(v => v > 0);
+        if (!reps.length) return;
+        const e1rm = Number(match.working_load) * (1 + Math.max(...reps) / 30);
+        points.push({ week, value: Math.round(e1rm * 10) / 10 });
+      });
       chartE1RMInstance = new Chart(ctx, {
         type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: `${exerciseFilter} e1RM (kg)`,
-            data: dataPoints,
-            borderColor: '#0066FF',
-            backgroundColor: 'rgba(0, 102, 255, 0.1)',
-            borderWidth: 3,
-            fill: true,
-            tension: 0.3
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: false } }
-        }
+        data: { labels: points.map(p => `Week ${p.week}`), datasets: [{ label: `${exerciseFilter} e1RM (kg)`, data: points.map(p => p.value), borderColor: '#0066FF', backgroundColor: 'rgba(0, 102, 255, 0.1)', borderWidth: 3, fill: true, tension: 0.3 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: points.length === 0, text: 'No historical data available yet.' } }, scales: { y: { beginAtZero: false } } }
       });
     }
 
     function renderVolumeRpeChart() {
       const ctx = document.getElementById('chartVolumeRpe').getContext('2d');
       if (chartVolumeRpeInstance) chartVolumeRpeInstance.destroy();
-
-      let labels = ["Week 1", "Week 2", "Week 3", "Week 4"];
-      let volumeData = [0, 0, 0, 0];
-
-      for (let i = 1; i <= 4; i++) {
-        let projName = `Week ${i}`;
-        let localData = localStorage.getItem(`workout_data_${currentUser}_${projName}`);
-        if (localData) {
-          let rows = JSON.parse(localData);
-          let totalVol = 0;
-          rows.forEach(r => {
-            let totalReps = (r.set1_reps || 0) + (r.set2_reps || 0) + (r.set3_reps || 0) + (r.set4_reps || 0);
-            totalVol += (r.working_load || 0) * totalReps;
-          });
-          volumeData[i - 1] = totalVol;
-        }
-      }
-
+      const points = getHistoricalWeekRows().map(({ week, rows }) => {
+        const volume = rows.reduce((sum, r) => sum + (Number(r.working_load) || 0) * ([r.set1_reps, r.set2_reps, r.set3_reps, r.set4_reps].reduce((a, v) => a + (Number(v) || 0), 0)), 0);
+        return { week, value: volume };
+      }).filter(p => p.value > 0);
       chartVolumeRpeInstance = new Chart(ctx, {
         type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Total Volume Load (kg)',
-            data: volumeData,
-            backgroundColor: '#3b82f6',
-            borderRadius: 8
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } }
-        }
+        data: { labels: points.map(p => `Week ${p.week}`), datasets: [{ label: 'Total Volume Load (kg)', data: points.map(p => p.value), backgroundColor: '#3b82f6', borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: points.length === 0, text: 'No historical data available yet.' } } }
       });
     }
 
@@ -2693,199 +2352,26 @@ function loadLocalWorkoutData(
     function renderACWRChart() {
       const ctx = document.getElementById('chartACWR').getContext('2d');
       if (chartACWRInstance) chartACWRInstance.destroy();
-
+      const weekly = getHistoricalWeekRows().map(({ week, rows }) => ({
+        week,
+        volume: rows.reduce((sum, r) => sum + (Number(r.working_load) || 0) * ([r.set1_reps, r.set2_reps, r.set3_reps, r.set4_reps].reduce((a, v) => a + (Number(v) || 0), 0)), 0)
+      }));
+      const points = [];
+      weekly.forEach((item, idx) => {
+        if (idx < 4) return;
+        const prior = weekly.slice(idx - 4, idx).map(x => x.volume).filter(v => v > 0);
+        if (item.volume > 0 && prior.length === 4) {
+          const chronic = prior.reduce((a, b) => a + b, 0) / 4;
+          if (chronic > 0) points.push({ week: item.week, value: Math.round((item.volume / chronic) * 100) / 100 });
+        }
+      });
       chartACWRInstance = new Chart(ctx, {
         type: 'line',
-        data: {
-          labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
-          datasets: [{
-            label: 'ACWR Ratio',
-            data: [0.95, 1.05, 1.15, 1.00],
-            borderColor: '#10b981',
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            borderWidth: 3,
-            fill: true,
-            tension: 0.3
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { min: 0.5, max: 1.8 }
-          }
-        }
+        data: { labels: points.map(p => `Week ${p.week}`), datasets: [{ label: 'ACWR Ratio', data: points.map(p => p.value), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 3, fill: true, tension: 0.3 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: points.length === 0, text: 'No sufficient historical data for ACWR.' } }, scales: { y: { min: 0.5, max: 1.8 } } }
       });
     }
 
-    function loadAdminData() {
-      showSpinner("Loading admin data...");
-      const payload = { action: "getAdminData", username: currentUser };
-      apiRequest(payload, { silentAuthError: true }).then(res => {
-        hideSpinner();
-        if (res.status === "success") {
-          adminFetchedUsers = res.usersData || [];
-          renderAdminUsers(res.usersMeta || []);
-          renderAdminLogs(res.activityLogs || []);
-        } else {
-          showModernAlert(res.message, "Admin Error", "alert-circle");
-        }
-      })
-      .catch(err => {
-        hideSpinner();
-        showModernAlert("Failed to load admin data: " + err.toString(), "Connection Error", "alert-circle");
-      });
-    }
-
-    function renderAdminUsers(usersMeta) {
-      const tbody = document.getElementById("adminUsersTable");
-      if (!tbody) return;
-      tbody.innerHTML = "";
-
-      if (usersMeta.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center themed-text-muted">No registered users found.</td></tr>`;
-        return;
-      }
-
-      usersMeta.forEach(u => {
-        const tr = document.createElement("tr");
-        let statusBadge = u.status === "ACTIVE" 
-          ? `<span class="px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 rounded-full">ACTIVE</span>`
-          : `<span class="px-2.5 py-1 text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 rounded-full">PENDING</span>`;
-
-        let actionBtn = u.status === "PENDING"
-          ? `<button onclick="approveUser('${u.user}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm">Approve</button>`
-          : `<button onclick="viewUserDetail('${u.user}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm">View Profile</button>`;
-
-        tr.innerHTML = `
-          <td class="p-3 font-semibold">${u.user}</td>
-          <td class="p-3">${statusBadge}</td>
-          <td class="p-3 text-center space-x-2">
-            ${actionBtn}
-            <button onclick="deleteUser('${u.user}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-sm">Delete</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function renderAdminLogs(logs) {
-      const tbody = document.getElementById("adminLogsTable");
-      if (!tbody) return;
-      tbody.innerHTML = "";
-
-      if (logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center themed-text-muted">No activity logs recorded.</td></tr>`;
-        return;
-      }
-
-      logs.reverse().forEach(l => {
-        const tr = document.createElement("tr");
-        const timeFormatted = new Date(l.time).toLocaleString();
-        tr.innerHTML = `
-          <td class="p-2.5 themed-text-muted">${timeFormatted}</td>
-          <td class="p-2.5 font-semibold">${l.user}</td>
-          <td class="p-2.5">${l.activity}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function approveUser(targetUser) {
-      showSpinner(`Approving user ${targetUser}...`);
-      const payload = { action: "approveUser", targetUser: targetUser, adminUser: currentUser };
-      apiRequest(payload, { silentAuthError: true }).then(res => {
-        hideSpinner();
-        if (res.status === "success") {
-          showToast(res.message, "success", 2500);
-          loadAdminData();
-        } else {
-          showModernAlert(res.message, "Approval Failed", "alert-circle");
-        }
-      })
-      .catch(err => {
-        hideSpinner();
-        showModernAlert("Network error: " + err.toString(), "Connection Error", "alert-circle");
-      });
-    }
-
-    function deleteUser(targetUser) {
-      showModernConfirm(`Are you sure you want to delete user '${targetUser}' and all their data?`, "Delete User", "trash-2").then(confirmed => {
-        if (confirmed) {
-          showSpinner(`Deleting user ${targetUser}...`);
-          const payload = { action: "deleteUser", targetUser: targetUser, adminUser: currentUser };
-          apiRequest(payload, { silentAuthError: true }).then(res => {
-            hideSpinner();
-            if (res.status === "success") {
-              showToast(res.message, "success", 2500);
-              loadAdminData();
-            } else {
-              showModernAlert(res.message, "Delete Failed", "alert-circle");
-            }
-          })
-          .catch(err => {
-            hideSpinner();
-            showModernAlert("Network error: " + err.toString(), "Connection Error", "alert-circle");
-          });
-        }
-      });
-    }
-
-    function viewUserDetail(username) {
-      const container = document.getElementById("adminUserDetailContainer");
-      const title = document.getElementById("userDetailTitle");
-      const overview = document.getElementById("userStatsOverview");
-      const benchmarksList = document.getElementById("userBenchmarksList");
-
-      container.classList.remove("hidden");
-      title.innerHTML = `<i data-lucide="user-check" class="w-4 h-4"></i> Profile & Stats: ${username}`;
-
-      let userEntries = adminFetchedUsers.filter(u => u.user.toLowerCase() === username.toLowerCase());
-      let totalProjects = userEntries.length;
-      let totalSetsLogged = 0;
-
-      userEntries.forEach(e => {
-        e.rows.forEach(r => {
-          if (r.set1_reps > 0) totalSetsLogged++;
-          if (r.set2_reps > 0) totalSetsLogged++;
-          if (r.set3_reps > 0) totalSetsLogged++;
-          if (r.set4_reps > 0) totalSetsLogged++;
-        });
-      });
-
-      overview.innerHTML = `
-        <div class="themed-subcard p-3 rounded-xl border">
-          <span class="text-xs themed-text-muted block">Active Projects</span>
-          <span class="text-lg font-bold text-blue-600 dark:text-blue-400">${totalProjects}</span>
-        </div>
-        <div class="themed-subcard p-3 rounded-xl border">
-          <span class="text-xs themed-text-muted block">Total Sets Logged</span>
-          <span class="text-lg font-bold text-emerald-600 dark:text-emerald-400">${totalSetsLogged}</span>
-        </div>
-        <div class="themed-subcard p-3 rounded-xl border">
-          <span class="text-xs themed-text-muted block">Account Status</span>
-          <span class="text-lg font-bold">ACTIVE</span>
-        </div>
-      `;
-
-      let savedBenchmarks = JSON.parse(localStorage.getItem(`workout_benchmarks_${username}`) || "{}");
-      benchmarksList.innerHTML = "";
-
-      Object.keys(savedBenchmarks).forEach(ex => {
-        const div = document.createElement("div");
-        div.className = "themed-subcard p-2.5 rounded-xl border text-xs";
-        div.innerHTML = `<span class="themed-text-muted block text-[10px]">${ex}</span><b class="text-sm">${savedBenchmarks[ex]} kg</b>`;
-        benchmarksList.appendChild(div);
-      });
-
-      lucide.createIcons();
-      container.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function closeUserDetail() {
-      document.getElementById("adminUserDetailContainer").classList.add("hidden");
-    }
   </script>
 </body>
 </html>
