@@ -167,15 +167,36 @@
       }
     }
 
-    /* Helper styles untuk kontrol visibilitas elemen berdasarkan autentikasi */
-    body.authenticated .auth-only {
-      display: flex !important;
-    }
-    body.authenticated .mobile-menu-btn {
-      display: block !important;
-    }
+    /* Modifikasi CSS Responsive Drawer & Navbar */
     #mobileDrawer.is-open {
       display: block !important;
+    }
+
+    @media (min-width: 768px) {
+      body.authenticated #headerNavTabs {
+        display: flex !important;
+      }
+      body.authenticated #signOutBtnHeader {
+        display: flex !important;
+      }
+      #mobileMenuBtn {
+        display: none !important;
+      }
+      #mobileDrawer {
+        display: none !important;
+      }
+    }
+
+    @media (max-width: 767px) {
+      #headerNavTabs {
+        display: none !important;
+      }
+      #signOutBtnHeader {
+        display: none !important;
+      }
+      body.authenticated #mobileMenuBtn {
+        display: block !important;
+      }
     }
   </style>
 </head>
@@ -194,7 +215,7 @@
           </div>
         </div>
 
-        <nav id="headerNavTabs" class="hidden md:flex items-center space-x-1 auth-only">
+        <nav id="headerNavTabs" class="hidden items-center space-x-1">
           <button id="navWorkoutBtn" onclick="switchAppTab('workout')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition text-white bg-blue-600 flex items-center gap-2">
             <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i> Workout Log
           </button>
@@ -205,25 +226,22 @@
       </div>
       
       <div class="flex items-center space-x-3 h-full">
-        <p class="hidden text-xs opacity-90 items-center gap-1.5 cursor-pointer hover:bg-white/10 transition bg-transparent px-3 py-1.5 rounded-lg border border-white/20 h-8 text-white auth-only" id="syncStatus" onclick="showSyncDetailModal()">
+        <p class="hidden text-xs opacity-90 items-center gap-1.5 cursor-pointer hover:bg-white/10 transition bg-transparent px-3 py-1.5 rounded-lg border border-white/20 h-8 text-white" id="syncStatus" onclick="showSyncDetailModal()">
           <span id="statusIndicator" class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-sm shadow-emerald-400"></span>
           <span id="statusText">Online · Synced</span>
         </p>
 
-        <!-- Hamburger Button: hidden di PC (md:hidden), aktif di mobile setelah login -->
-        <button id="mobileMenuBtn" onclick="toggleMobileDrawer()" class="hidden text-white p-2 rounded-lg hover:bg-white/10 focus:outline-none md:!hidden">
+        <button id="mobileMenuBtn" onclick="toggleMobileDrawer()" class="hidden text-white p-2 rounded-lg hover:bg-white/10 focus:outline-none">
           <i data-lucide="menu" class="w-5 h-5"></i>
         </button>
 
-        <!-- Sign Out Button: hanya tampil setelah terautentikasi (auth-only) -->
-        <button id="signOutBtnHeader" onclick="handleLogout()" class="hidden text-xs bg-transparent hover:bg-white/10 text-white border border-white/20 px-3 py-1.5 rounded-lg transition items-center gap-1.5 active:scale-95 font-semibold h-8 auth-only">
+        <button id="signOutBtnHeader" onclick="handleLogout()" class="hidden text-xs bg-transparent hover:bg-white/10 text-white border border-white/20 px-3 py-1.5 rounded-lg transition items-center gap-1.5 active:scale-95 font-semibold h-8">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Sign Out</span>
         </button>
       </div>
     </div>
 
-    <!-- Drawer Mobile Menu: hidden di PC (md:hidden) -->
-    <div id="mobileDrawer" class="hidden md:!hidden border-t border-gray-800 bg-[#161B26] px-4 py-3 space-y-2 transition-all duration-300">
+    <div id="mobileDrawer" class="hidden border-t border-gray-800 bg-[#161B26] px-4 py-3 space-y-2 transition-all duration-300">
       <button id="mobileNavWorkoutBtn" onclick="switchAppTab('workout'); toggleMobileDrawer(false);" class="w-full text-left px-4 py-2 text-xs font-bold rounded-lg text-white bg-blue-600 flex items-center gap-2">
         <i data-lucide="clipboard-list" class="w-4 h-4"></i> Workout Log
       </button>
@@ -1345,6 +1363,9 @@
       return Math.round(mround2_5(baseline) * 10) / 10;
     }
 
+    // Initial-load recommendation parameters. The three assessed anchors are:
+    // Push = Bench Press, Pull = Bent-over Barbell Row, Legs = Squat.
+    // Ratios are centralized here so they can be tuned later without changing workflow logic.
     const baselineLoadParameters = {
       "Barbell Bench Press": { anchor: "PUSH", ratio: 1.00, label: "Push anchor" },
       "Barbell Overhead Press": { anchor: "PUSH", ratio: 0.65, label: "60–70% of Bench Press" },
@@ -1528,6 +1549,7 @@
     }
 
     function registerServiceWorker() {
+      // sw.js is optional. Do not surface a console error when the file is not deployed.
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           fetch('./sw.js', { method: 'HEAD' }).then(r => {
@@ -1592,9 +1614,9 @@
       const savedToken = localStorage.getItem("coregrip_auth_token");
       const savedProj = localStorage.getItem("coregrip_current_project");
 
+      // Reset state autentikasi pada elemen UI
       document.body.classList.remove("authenticated");
       document.getElementById("mobileDrawer")?.classList.remove("is-open");
-      document.getElementById("mobileMenuBtn")?.classList.remove("mobile-menu-btn");
 
       if (savedUser && savedToken) {
         currentUser = savedUser;
@@ -1605,12 +1627,11 @@
         document.body.classList.add("authenticated");
         document.getElementById("authSection").classList.add("hidden");
         document.getElementById("appSection").classList.remove("hidden");
-        document.getElementById("mobileMenuBtn").classList.add("mobile-menu-btn");
+        document.getElementById("syncStatus").style.display = "flex";
 
         if (isAdmin) {
           document.getElementById("adminSection").classList.remove("hidden");
           document.getElementById("appSection").classList.add("hidden");
-          document.getElementById("headerNavTabs").classList.add("hidden");
           document.getElementById("tabWorkout")?.parentElement?.parentElement?.classList.add("hidden");
           loadAdminData();
         } else {
@@ -1627,6 +1648,7 @@
         document.getElementById("authSection")?.classList.remove("hidden");
         document.getElementById("appSection")?.classList.add("hidden");
         document.getElementById("adminSection")?.classList.add("hidden");
+        document.getElementById("syncStatus").style.display = "none";
       }
     }
 
@@ -1689,10 +1711,16 @@
 
       const loadBench = parseFloat(document.getElementById("test_load_bench").value);
       const repsBench = parseInt(document.getElementById("test_reps_bench").value, 10);
-      const loadPull = parseFloat(document.getElementById("test_load_pull")?.value || 0);
-      const repsPull = parseInt(document.getElementById("test_reps_pull")?.value || 0, 10);
+      const loadPull = parseFloat(document.getElementById("test_load_pull").value);
+      const repsPull = parseInt(document.getElementById("test_reps_pull").value, 10);
       const loadSquat = parseFloat(document.getElementById("test_load_squat").value);
       const repsSquat = parseInt(document.getElementById("test_reps_squat").value, 10);
+
+      if (![loadBench, repsBench, loadPull, repsPull, loadSquat, repsSquat].every(Number.isFinite) ||
+          [loadBench, loadPull, loadSquat].some(v => v <= 0) || [repsBench, repsPull, repsSquat].some(v => v <= 0)) {
+        showModernAlert("Please enter a valid trial load and maximum repetitions for all three baseline exercises.", "Baseline Assessment Required", "alert-circle");
+        return;
+      }
 
       const anchorBaselines = {
         "Barbell Bench Press": first_set_assessment(loadBench, repsBench),
@@ -1924,105 +1952,12 @@
           localStorage.removeItem("coregrip_is_admin");
           localStorage.removeItem("coregrip_current_project");
           localStorage.removeItem("coregrip_auth_token");
+          currentUser = null;
+          isAdmin = false;
           authToken = null;
-          document.body.classList.remove("authenticated");
-          toggleMobileDrawer(false);
-          location.reload();
+          checkSession();
         }
       });
-    }
-
-    function initializeBlankWorkoutState() {
-      currentProject = "";
-      workoutRows = [];
-      const weekInput = document.getElementById("inputProject");
-      const bwInput = document.getElementById("inputBodyWeight");
-      if (weekInput) weekInput.value = "";
-      if (bwInput) { bwInput.value = ""; bwInput.disabled = true; }
-      document.getElementById("workoutTableBody").innerHTML = "";
-      checkFormActivation();
-      updateWorkoutVisibility();
-      loadUserBaselines();
-    }
-
-    function loadUserBaselines() {
-      if (!currentUser || !authToken) return;
-      fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getBaselines", username: currentUser, authToken }) })
-        .then(res => res.json())
-        .then(res => { if (res.status === "success") { userBaselines = res.baselines || {}; localStorage.setItem(`workout_benchmarks_${currentUser}`, JSON.stringify(userBaselines)); } })
-        .catch(() => {});
-    }
-
-    function loadProjectDataFromCloud(proj) {
-      const payload = { action: "getData", username: currentUser, project: proj, authToken };
-
-      fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify(payload)
-      })
-      .then(res => res.json())
-      .then(res => {
-        hideSpinner();
-        if (handleAuthFailure(res)) return;
-        if (res.status === "success") {
-          workoutRows = res.rows || [];
-          localStorage.setItem(`workout_data_${currentUser}_${proj}`, JSON.stringify(workoutRows));
-          renderWorkoutTable();
-        } else {
-          let localData = localStorage.getItem(`workout_data_${currentUser}_${proj}`);
-          if (localData) {
-            workoutRows = JSON.parse(localData);
-            renderWorkoutTable();
-          }
-        }
-      })
-      .catch(err => {
-        hideSpinner();
-        let localData = localStorage.getItem(`workout_data_${currentUser}_${proj}`);
-        if (localData) {
-          workoutRows = JSON.parse(localData);
-          renderWorkoutTable();
-        }
-      });
-    }
-
-    function renderWorkoutTable() {
-      const tbody = document.getElementById("workoutTableBody");
-      if (!tbody) return;
-      tbody.innerHTML = "";
-
-      if (workoutRows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted">No workout records found for this program. Log your first exercise above!</td></tr>`;
-        return;
-      }
-
-      workoutRows.forEach((r, idx) => {
-        const tr = document.createElement("tr");
-        tr.className = "hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors";
-
-        let sideWeight = calculateSideWeight(r.exercise, r.working_load);
-        let sideText = `${r.working_load} kg`;
-        const exLower = (r.exercise || "").toLowerCase();
-        if (exLower.includes("barbell") || exLower.includes("dumbbell")) {
-          sideText = `${r.working_load} kg <span class="text-[11px] themed-text-muted">(${sideWeight}k/side)</span>`;
-        }
-
-        tr.innerHTML = `
-          <td class="px-4 py-3.5 font-semibold text-xs">${r.day_session || '-'}</td>
-          <td class="px-4 py-3.5 font-bold text-xs text-blue-600 dark:text-blue-400">${r.exercise || '-'}</td>
-          <td class="px-4 py-3.5 text-center text-xs font-semibold">${r.target_reps || '-'}</td>
-          <td class="px-4 py-3.5 text-right text-xs font-bold">${sideText}</td>
-          <td class="px-4 py-3.5 text-center text-xs font-medium">${r.set1_reps || 0} / ${r.set2_reps || 0} / ${r.set3_reps || 0} / ${r.set4_reps || 0}</td>
-          <td class="px-4 py-3.5 text-right text-xs font-extrabold text-emerald-600 dark:text-emerald-400">${r.next_load || r.working_load} kg</td>
-          <td class="px-4 py-3.5 text-center">
-            <button onclick="editExerciseRecord(${idx})" class="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg text-blue-600 dark:text-blue-400 transition" title="Edit">
-              <i data-lucide="edit-3" class="w-4 h-4"></i>
-            </button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-      lucide.createIcons();
     }
   </script>
 </body>
