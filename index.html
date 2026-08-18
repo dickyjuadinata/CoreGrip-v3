@@ -166,6 +166,17 @@
         font-size: 16px !important;
       }
     }
+
+    /* Helper styles untuk kontrol visibilitas elemen berdasarkan autentikasi */
+    body.authenticated .auth-only {
+      display: flex !important;
+    }
+    body.authenticated .mobile-menu-btn {
+      display: block !important;
+    }
+    #mobileDrawer.is-open {
+      display: block !important;
+    }
   </style>
 </head>
 <body class="font-sans min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white relative overflow-x-hidden w-full">
@@ -183,7 +194,7 @@
           </div>
         </div>
 
-        <nav id="headerNavTabs" class="hidden items-center space-x-1">
+        <nav id="headerNavTabs" class="hidden md:flex items-center space-x-1 auth-only">
           <button id="navWorkoutBtn" onclick="switchAppTab('workout')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition text-white bg-blue-600 flex items-center gap-2">
             <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i> Workout Log
           </button>
@@ -194,22 +205,25 @@
       </div>
       
       <div class="flex items-center space-x-3 h-full">
-        <p class="hidden text-xs opacity-90 items-center gap-1.5 cursor-pointer hover:bg-white/10 transition bg-transparent px-3 py-1.5 rounded-lg border border-white/20 h-8 text-white" id="syncStatus" onclick="showSyncDetailModal()">
+        <p class="hidden text-xs opacity-90 items-center gap-1.5 cursor-pointer hover:bg-white/10 transition bg-transparent px-3 py-1.5 rounded-lg border border-white/20 h-8 text-white auth-only" id="syncStatus" onclick="showSyncDetailModal()">
           <span id="statusIndicator" class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-sm shadow-emerald-400"></span>
           <span id="statusText">Online · Synced</span>
         </p>
 
-        <button id="mobileMenuBtn" onclick="toggleMobileDrawer()" class="hidden text-white p-2 rounded-lg hover:bg-white/10 focus:outline-none">
+        <!-- Hamburger Button: hidden di PC (md:hidden), aktif di mobile setelah login -->
+        <button id="mobileMenuBtn" onclick="toggleMobileDrawer()" class="hidden text-white p-2 rounded-lg hover:bg-white/10 focus:outline-none md:!hidden">
           <i data-lucide="menu" class="w-5 h-5"></i>
         </button>
 
-        <button id="signOutBtnHeader" onclick="handleLogout()" class="hidden text-xs bg-transparent hover:bg-white/10 text-white border border-white/20 px-3 py-1.5 rounded-lg transition items-center gap-1.5 active:scale-95 font-semibold h-8">
+        <!-- Sign Out Button: hanya tampil setelah terautentikasi (auth-only) -->
+        <button id="signOutBtnHeader" onclick="handleLogout()" class="hidden text-xs bg-transparent hover:bg-white/10 text-white border border-white/20 px-3 py-1.5 rounded-lg transition items-center gap-1.5 active:scale-95 font-semibold h-8 auth-only">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Sign Out</span>
         </button>
       </div>
     </div>
 
-    <div id="mobileDrawer" class="hidden border-t border-gray-800 bg-[#161B26] px-4 py-3 space-y-2 transition-all duration-300">
+    <!-- Drawer Mobile Menu: hidden di PC (md:hidden) -->
+    <div id="mobileDrawer" class="hidden md:!hidden border-t border-gray-800 bg-[#161B26] px-4 py-3 space-y-2 transition-all duration-300">
       <button id="mobileNavWorkoutBtn" onclick="switchAppTab('workout'); toggleMobileDrawer(false);" class="w-full text-left px-4 py-2 text-xs font-bold rounded-lg text-white bg-blue-600 flex items-center gap-2">
         <i data-lucide="clipboard-list" class="w-4 h-4"></i> Workout Log
       </button>
@@ -270,30 +284,18 @@
               <div class="flex justify-between items-center text-xs">
                 <span class="font-semibold">Barbell Bench Press</span>
               </div>
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-3 gap-2">
                 <div>
                   <label class="text-[10px] themed-text-muted block font-medium">Load (kg)</label>
                   <input type="number" inputmode="decimal" step="0.1" id="test_load_bench" placeholder="20" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_reps_bench">
                 </div>
                 <div>
                   <label class="text-[10px] themed-text-muted block font-medium">Reps</label>
-                  <input type="number" inputmode="numeric" step="1" id="test_reps_bench" placeholder="6-8" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_load_pull">
-                </div>
-              </div>
-            </div>
-
-            <div class="themed-subcard p-3 rounded-xl border space-y-2">
-              <div class="flex justify-between items-center text-xs">
-                <span class="font-semibold">Bent-over Barbell Row</span>
-              </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="text-[10px] themed-text-muted block font-medium">Load (kg)</label>
-                  <input type="number" inputmode="decimal" step="0.1" id="test_load_pull" placeholder="20" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_reps_pull">
+                  <input type="number" inputmode="numeric" step="1" id="test_reps_bench" placeholder="6-8" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_rpe_bench">
                 </div>
                 <div>
-                  <label class="text-[10px] themed-text-muted block font-medium">Reps</label>
-                  <input type="number" inputmode="numeric" step="1" id="test_reps_pull" placeholder="6-8" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_load_squat">
+                  <label class="text-[10px] themed-text-muted block font-medium">RPE</label>
+                  <input type="number" inputmode="decimal" step="0.1" id="test_rpe_bench" placeholder="1-10" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_load_squat">
                 </div>
               </div>
             </div>
@@ -302,14 +304,38 @@
               <div class="flex justify-between items-center text-xs">
                 <span class="font-semibold">Barbell Squats</span>
               </div>
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-3 gap-2">
                 <div>
                   <label class="text-[10px] themed-text-muted block font-medium">Load (kg)</label>
                   <input type="number" inputmode="decimal" step="0.1" id="test_load_squat" placeholder="20" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_reps_squat">
                 </div>
                 <div>
                   <label class="text-[10px] themed-text-muted block font-medium">Reps</label>
-                  <input type="number" inputmode="numeric" step="1" id="test_reps_squat" placeholder="6-8" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="btnRegisterSubmit">
+                  <input type="number" inputmode="numeric" step="1" id="test_reps_squat" placeholder="6-8" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_rpe_squat">
+                </div>
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">RPE</label>
+                  <input type="number" inputmode="decimal" step="0.1" id="test_rpe_squat" placeholder="1-10" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_load_lat">
+                </div>
+              </div>
+            </div>
+
+            <div class="themed-subcard p-3 rounded-xl border space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="font-semibold">Dumbbell Lateral Raises</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">Load (kg)</label>
+                  <input type="number" inputmode="decimal" step="0.1" id="test_load_lat" placeholder="5" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_reps_lat">
+                </div>
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">Reps</label>
+                  <input type="number" inputmode="numeric" step="1" id="test_reps_lat" placeholder="8-10" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="test_rpe_lat">
+                </div>
+                <div>
+                  <label class="text-[10px] themed-text-muted block font-medium">RPE</label>
+                  <input type="number" inputmode="decimal" step="0.1" id="test_rpe_lat" placeholder="1-10" class="w-full px-2 py-1 themed-input border rounded-lg text-xs font-semibold enter-nav" data-next="btnRegisterSubmit">
                 </div>
               </div>
             </div>
@@ -657,7 +683,6 @@
     let editIndex = -1;
     let originalBaseLoad = 0;
     let isManualLoad = false;
-    let userBaselines = {};
 
     let lastSyncedTime = null;
     let pendingQueueCount = 0;
@@ -667,12 +692,6 @@
     let lastBodyWeight = "";
     let activeRestTimer = null;
     let adminFetchedUsers = [];
-    let activePopoverIndex = -1;
-
-    let chartInstanceE1RM = null;
-    let chartInstanceVolumeRpe = null;
-    let chartInstanceMuscleDist = null;
-    let chartInstanceACWR = null;
 
     const exercisePresets = {
       "Barbell Bench Press": { session: "Mon - Upper A", reps: "6-8", rest: "3-5 min", restSeconds: 300, sets: 4, isFirst: true, muscleGroup: "Chest", type: "COMPOUND" },
@@ -786,22 +805,18 @@
       if (!drawer) return;
       if (!document.body.classList.contains("authenticated")) {
         drawer.classList.remove("is-open");
-        drawer.classList.add("hidden");
         return;
       }
 
-      const isOpen = typeof forceState === 'boolean' ? forceState : drawer.classList.contains("hidden");
-
-      if (isOpen) {
-        drawer.classList.remove("hidden");
-        drawer.classList.add("is-open");
+      if (typeof forceState === 'boolean') {
+        drawer.classList.toggle("is-open", forceState);
       } else {
-        drawer.classList.add("hidden");
-        drawer.classList.remove("is-open");
+        drawer.classList.toggle("is-open");
       }
 
       if (menuBtn) {
-        menuBtn.innerHTML = `<i data-lucide="${isOpen ? 'x' : 'menu'}" class="w-5 h-5"></i>`;
+        const isHidden = !drawer.classList.contains("is-open");
+        menuBtn.innerHTML = `<i data-lucide="${isHidden ? 'menu' : 'x'}" class="w-5 h-5"></i>`;
         lucide.createIcons();
       }
     }
@@ -1577,13 +1592,9 @@
       const savedToken = localStorage.getItem("coregrip_auth_token");
       const savedProj = localStorage.getItem("coregrip_current_project");
 
-      // Strictly force header, drawer, and sign out options to be hidden when logged out
       document.body.classList.remove("authenticated");
-      document.getElementById("headerNavTabs")?.classList.add("hidden");
-      document.getElementById("mobileDrawer")?.classList.add("hidden");
       document.getElementById("mobileDrawer")?.classList.remove("is-open");
-      document.getElementById("mobileMenuBtn")?.classList.add("hidden");
-      document.getElementById("signOutBtnHeader")?.classList.add("hidden");
+      document.getElementById("mobileMenuBtn")?.classList.remove("mobile-menu-btn");
 
       if (savedUser && savedToken) {
         currentUser = savedUser;
@@ -1594,20 +1605,18 @@
         document.body.classList.add("authenticated");
         document.getElementById("authSection").classList.add("hidden");
         document.getElementById("appSection").classList.remove("hidden");
-        document.getElementById("mobileMenuBtn")?.classList.remove("hidden");
-        document.getElementById("signOutBtnHeader")?.classList.remove("hidden");
-        document.getElementById("syncStatus").style.display = "flex";
+        document.getElementById("mobileMenuBtn").classList.add("mobile-menu-btn");
 
         if (isAdmin) {
           document.getElementById("adminSection").classList.remove("hidden");
           document.getElementById("appSection").classList.add("hidden");
           document.getElementById("headerNavTabs").classList.add("hidden");
+          document.getElementById("tabWorkout")?.parentElement?.parentElement?.classList.add("hidden");
           loadAdminData();
         } else {
           document.getElementById("adminSection").classList.add("hidden");
           document.getElementById("appSection").classList.remove("hidden");
-          document.getElementById("headerNavTabs").classList.remove("hidden");
-          document.getElementById("headerNavTabs").classList.add("flex");
+          document.getElementById("tabWorkout")?.parentElement?.parentElement?.classList.remove("hidden");
           initializeBlankWorkoutState();
         }
       } else {
@@ -1618,7 +1627,6 @@
         document.getElementById("authSection")?.classList.remove("hidden");
         document.getElementById("appSection")?.classList.add("hidden");
         document.getElementById("adminSection")?.classList.add("hidden");
-        document.getElementById("syncStatus").style.display = "none";
       }
     }
 
@@ -1681,16 +1689,10 @@
 
       const loadBench = parseFloat(document.getElementById("test_load_bench").value);
       const repsBench = parseInt(document.getElementById("test_reps_bench").value, 10);
-      const loadPull = parseFloat(document.getElementById("test_load_pull").value);
-      const repsPull = parseInt(document.getElementById("test_reps_pull").value, 10);
+      const loadPull = parseFloat(document.getElementById("test_load_pull")?.value || 0);
+      const repsPull = parseInt(document.getElementById("test_reps_pull")?.value || 0, 10);
       const loadSquat = parseFloat(document.getElementById("test_load_squat").value);
       const repsSquat = parseInt(document.getElementById("test_reps_squat").value, 10);
-
-      if (![loadBench, repsBench, loadPull, repsPull, loadSquat, repsSquat].every(Number.isFinite) ||
-          [loadBench, loadPull, loadSquat].some(v => v <= 0) || [repsBench, repsPull, repsSquat].some(v => v <= 0)) {
-        showModernAlert("Please enter a valid trial load and maximum repetitions for all three baseline exercises.", "Baseline Assessment Required", "alert-circle");
-        return;
-      }
 
       const anchorBaselines = {
         "Barbell Bench Press": first_set_assessment(loadBench, repsBench),
@@ -1923,11 +1925,9 @@
           localStorage.removeItem("coregrip_current_project");
           localStorage.removeItem("coregrip_auth_token");
           authToken = null;
-          currentUser = null;
-          isAdmin = false;
           document.body.classList.remove("authenticated");
           toggleMobileDrawer(false);
-          checkSession();
+          location.reload();
         }
       });
     }
@@ -1943,20 +1943,6 @@
       checkFormActivation();
       updateWorkoutVisibility();
       loadUserBaselines();
-    }
-
-    function changeProjectFreetext() {
-      const numVal = document.getElementById("inputProject").value.trim();
-      if (!numVal) {
-        currentProject = "";
-        workoutRows = [];
-        renderWorkoutTable();
-        return;
-      }
-
-      currentProject = `Week ${numVal}`;
-      localStorage.setItem("coregrip_current_project", currentProject);
-      loadProjectDataFromCloud(currentProject);
     }
 
     function loadUserBaselines() {
@@ -2021,329 +2007,22 @@
           sideText = `${r.working_load} kg <span class="text-[11px] themed-text-muted">(${sideWeight}k/side)</span>`;
         }
 
-        const preset = exercisePresets[r.exercise];
-        const maxSets = preset ? (preset.sets || 4) : 4;
-        let setDisplayArr = [];
-        if (maxSets >= 1) setDisplayArr.push(r.set1_reps ?? 0);
-        if (maxSets >= 2) setDisplayArr.push(r.set2_reps ?? 0);
-        if (maxSets >= 3) setDisplayArr.push(r.set3_reps ?? 0);
-        if (maxSets >= 4) setDisplayArr.push(r.set4_reps ?? 0);
-        
-        let repsStr = setDisplayArr.join(" - ");
-
         tr.innerHTML = `
-          <td class="px-4 py-3 font-semibold">${r.day_session || "-"}</td>
-          <td class="px-4 py-3 font-medium text-blue-600 dark:text-blue-400">${r.exercise || "-"}</td>
-          <td class="px-4 py-3 text-center font-medium">${r.target_reps || "-"}</td>
-          <td class="px-4 py-3 text-right font-bold">${sideText}</td>
-          <td class="px-4 py-3 text-center font-bold text-gray-700 dark:text-gray-300">${repsStr}</td>
-          <td class="px-4 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400">${r.next_load || 0} kg</td>
-          <td class="px-4 py-3 text-center">
-            <button onclick="openActionPopover(event, ${idx})" class="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition">
-              <i data-lucide="more-vertical" class="w-4 h-4"></i>
+          <td class="px-4 py-3.5 font-semibold text-xs">${r.day_session || '-'}</td>
+          <td class="px-4 py-3.5 font-bold text-xs text-blue-600 dark:text-blue-400">${r.exercise || '-'}</td>
+          <td class="px-4 py-3.5 text-center text-xs font-semibold">${r.target_reps || '-'}</td>
+          <td class="px-4 py-3.5 text-right text-xs font-bold">${sideText}</td>
+          <td class="px-4 py-3.5 text-center text-xs font-medium">${r.set1_reps || 0} / ${r.set2_reps || 0} / ${r.set3_reps || 0} / ${r.set4_reps || 0}</td>
+          <td class="px-4 py-3.5 text-right text-xs font-extrabold text-emerald-600 dark:text-emerald-400">${r.next_load || r.working_load} kg</td>
+          <td class="px-4 py-3.5 text-center">
+            <button onclick="editExerciseRecord(${idx})" class="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg text-blue-600 dark:text-blue-400 transition" title="Edit">
+              <i data-lucide="edit-3" class="w-4 h-4"></i>
             </button>
           </td>
         `;
         tbody.appendChild(tr);
       });
       lucide.createIcons();
-    }
-
-    function openActionPopover(e, idx) {
-      e.stopPropagation();
-      activePopoverIndex = idx;
-      const popover = document.getElementById("actionPopover");
-      const menu = document.getElementById("actionPopoverMenu");
-      if (!popover || !menu) return;
-
-      const rect = e.currentTarget.getBoundingClientRect();
-      menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-      menu.style.left = `${Math.min(rect.left + window.scrollX - 200, window.innerWidth - 270)}px`;
-
-      popover.classList.remove("hidden");
-    }
-
-    function closeActionPopover() {
-      const popover = document.getElementById("actionPopover");
-      if (popover) popover.classList.add("hidden");
-      activePopoverIndex = -1;
-    }
-
-    document.getElementById("btnMenuEdit")?.addEventListener("click", () => {
-      if (activePopoverIndex >= 0) {
-        editWorkoutRecord(activePopoverIndex);
-      }
-      closeActionPopover();
-    });
-
-    document.getElementById("btnMenuDeleteExercise")?.addEventListener("click", () => {
-      if (activePopoverIndex >= 0) {
-        deleteWorkoutRecord(activePopoverIndex);
-      }
-      closeActionPopover();
-    });
-
-    document.getElementById("btnMenuDeleteSession")?.addEventListener("click", () => {
-      if (activePopoverIndex >= 0) {
-        const record = workoutRows[activePopoverIndex];
-        if (record && record.day_session) {
-          deleteEntireSession(record.day_session);
-        }
-      }
-      closeActionPopover();
-    });
-
-    function editWorkoutRecord(idx) {
-      editIndex = idx;
-      const r = workoutRows[idx];
-      if (!r) return;
-
-      document.getElementById("inputDaySession").value = r.day_session;
-      onSessionChange(r.day_session);
-
-      document.getElementById("inputExercise").value = r.exercise;
-      onExerciseSelect(r.exercise);
-
-      document.getElementById("inputWorkingLoad").value = r.working_load;
-      document.getElementById("inputSet1").value = r.set1_reps;
-      document.getElementById("inputSet2").value = r.set2_reps;
-      document.getElementById("inputSet3").value = r.set3_reps;
-      document.getElementById("inputSet4").value = r.set4_reps;
-      document.getElementById("inputCatatan").value = r.catatan || "";
-
-      calculateLoadDetails();
-      document.getElementById("btnSaveWorkout").innerText = "Update Exercise Record";
-      showToast("Exercise data loaded for editing.", "info", 2000);
-    }
-
-    function deleteWorkoutRecord(idx) {
-      showModernConfirm("Are you sure you want to delete this exercise record?", "Delete Record", "trash-2").then(confirmed => {
-        if (confirmed) {
-          workoutRows.splice(idx, 1);
-          syncDataToServer();
-          renderWorkoutTable();
-          showToast("Record deleted.", "success", 2000);
-        }
-      });
-    }
-
-    function deleteEntireSession(sessionName) {
-      showModernConfirm(`Are you sure you want to delete ALL records for '${sessionName}' in this week?`, "Delete Entire Session", "alert-triangle").then(confirmed => {
-        if (confirmed) {
-          workoutRows = workoutRows.filter(r => r.day_session !== sessionName);
-          syncDataToServer();
-          renderWorkoutTable();
-          showToast(`Session ${sessionName} deleted completely.`, "success", 2500);
-        }
-      });
-    }
-
-    function resetForm() {
-      editIndex = -1;
-      document.getElementById("formWorkout").reset();
-      document.getElementById("btnSaveWorkout").innerText = "Save Exercise Record";
-      document.getElementById("autoRegNotice").classList.add("hidden");
-      document.getElementById("sideLoadDisplay").innerText = "- kg / side";
-      calculateWarmupPreview(0, "");
-    }
-
-    function addOrUpdateWorkout(e) {
-      e.preventDefault();
-
-      if (!currentProject) {
-        showModernAlert("Please enter a valid Week Number before saving records.", "Week Number Required", "alert-circle");
-        return;
-      }
-
-      const day_session = document.getElementById("inputDaySession").value;
-      const exercise = document.getElementById("inputExercise").value;
-      const target_reps = document.getElementById("inputTargetReps").value;
-      const working_load = parseFloat(document.getElementById("inputWorkingLoad").value) || 0;
-      const body_weight = parseFloat(document.getElementById("inputBodyWeight").value) || 0;
-
-      const set1_reps = parseInt(document.getElementById("inputSet1").value, 10) || 0;
-      const set2_reps = parseInt(document.getElementById("inputSet2").value, 10) || 0;
-      const set3_reps = parseInt(document.getElementById("inputSet3").value, 10) || 0;
-      const set4_reps = parseInt(document.getElementById("inputSet4").value, 10) || 0;
-      const catatan = document.getElementById("inputCatatan").value.trim();
-
-      const repsArr = [set1_reps, set2_reps, set3_reps, set4_reps];
-      const next_load = calculateNextWeekLoadQB13(exercise, target_reps, working_load, repsArr, catatan);
-
-      const record = {
-        project: currentProject,
-        day_session,
-        exercise,
-        target_reps,
-        working_load,
-        body_weight,
-        set1_reps,
-        set2_reps,
-        set3_reps,
-        set4_reps,
-        next_load,
-        catatan,
-        timestamp: new Date().toISOString()
-      };
-
-      if (editIndex >= 0) {
-        workoutRows[editIndex] = record;
-        showToast("Exercise record updated.", "success", 2500);
-      } else {
-        workoutRows.push(record);
-        showToast("New exercise record saved.", "success", 2500);
-      }
-
-      resetForm();
-      renderWorkoutTable();
-      syncDataToServer();
-    }
-
-    function syncDataToServer() {
-      localStorage.setItem(`workout_data_${currentUser}_${currentProject}`, JSON.stringify(workoutRows));
-      
-      if (!navigator.onLine) {
-        pendingQueueCount++;
-        updateOnlineStatus();
-        return;
-      }
-
-      const payload = {
-        action: "saveData",
-        username: currentUser,
-        project: currentProject,
-        authToken,
-        rows: workoutRows
-      };
-
-      fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify(payload)
-      })
-      .then(res => res.json())
-      .then(res => {
-        if (handleAuthFailure(res)) return;
-        if (res.status === "success") {
-          lastSyncedTime = new Date();
-          pendingQueueCount = 0;
-          updateOnlineStatus();
-        }
-      })
-      .catch(() => {
-        pendingQueueCount++;
-        updateOnlineStatus();
-      });
-    }
-
-    function renderAnalyticsDashboard() {
-      const filterEx = document.getElementById("analyticsExerciseFilter").value;
-      const currentRows = workoutRows.filter(r => r.exercise === filterEx);
-
-      renderChartE1RM(currentRows, filterEx);
-      renderChartVolumeRPE(workoutRows);
-      renderChartMuscleDistribution(workoutRows);
-      renderChartACWR(workoutRows);
-    }
-
-    function renderChartE1RM(rows, exerciseName) {
-      const ctx = document.getElementById("chartE1RM")?.getContext("2d");
-      if (!ctx) return;
-
-      if (chartInstanceE1RM) chartInstanceE1RM.destroy();
-
-      const labels = rows.map((r, i) => `Session ${i + 1}`);
-      const dataPoints = rows.map(r => {
-        const maxReps = Math.max(r.set1_reps, r.set2_reps, r.set3_reps, r.set4_reps);
-        if (maxReps === 0) return 0;
-        return (r.working_load * (1 + maxReps / 30)).toFixed(1);
-      });
-
-      chartInstanceE1RM = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels.length ? labels : ['No Data'],
-          datasets: [{
-            label: `e1RM Progress (kg) - ${exerciseName}`,
-            data: dataPoints.length ? dataPoints : [0],
-            borderColor: '#0066FF',
-            backgroundColor: 'rgba(0, 102, 255, 0.1)',
-            fill: true,
-            tension: 0.3
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
-    }
-
-    function renderChartVolumeRPE(rows) {
-      const ctx = document.getElementById("chartVolumeRpe")?.getContext("2d");
-      if (!ctx) return;
-
-      if (chartInstanceVolumeRpe) chartInstanceVolumeRpe.destroy();
-
-      const labels = rows.map((r, i) => r.exercise ? r.exercise.substring(0, 10) + '...' : `Ex ${i + 1}`);
-      const volumeData = rows.map(r => (r.set1_reps + r.set2_reps + r.set3_reps + r.set4_reps) * r.working_load);
-
-      chartInstanceVolumeRpe = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels.length ? labels : ['No Data'],
-          datasets: [{
-            label: 'Volume Load (kg)',
-            data: volumeData.length ? volumeData : [0],
-            backgroundColor: 'rgba(59, 130, 246, 0.8)'
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
-    }
-
-    function renderChartMuscleDistribution(rows) {
-      const ctx = document.getElementById("chartMuscleDistribution")?.getContext("2d");
-      if (!ctx) return;
-
-      if (chartInstanceMuscleDist) chartInstanceMuscleDist.destroy();
-
-      const muscleCounts = {};
-      rows.forEach(r => {
-        const preset = exercisePresets[r.exercise];
-        const group = preset ? preset.muscleGroup : "Other";
-        const setsCount = [r.set1_reps, r.set2_reps, r.set3_reps, r.set4_reps].filter(x => x > 0).length;
-        muscleCounts[group] = (muscleCounts[group] || 0) + setsCount;
-      });
-
-      chartInstanceMuscleDist = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: Object.keys(muscleCounts).length ? Object.keys(muscleCounts) : ['No Data'],
-          datasets: [{
-            data: Object.values(muscleCounts).length ? Object.values(muscleCounts) : [1],
-            backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
-    }
-
-    function renderChartACWR(rows) {
-      const ctx = document.getElementById("chartACWR")?.getContext("2d");
-      if (!ctx) return;
-
-      if (chartInstanceACWR) chartInstanceACWR.destroy();
-
-      chartInstanceACWR = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: ['W1', 'W2', 'W3', 'W4'],
-          datasets: [{
-            label: 'ACWR Fatigue Ratio',
-            data: [0.9, 1.1, 1.05, 1.2],
-            borderColor: '#10B981',
-            tension: 0.2
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
     }
   </script>
 </body>
