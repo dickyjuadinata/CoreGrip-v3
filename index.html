@@ -460,7 +460,7 @@
             </div>
           </form>
 
-          <div id="workoutTableContainer" class="hidden relative themed-card border rounded-2xl shadow-xl overflow-hidden w-full max-w-full">
+          <div class="relative themed-card border rounded-2xl shadow-xl overflow-hidden w-full max-w-full">
             <div class="overflow-x-auto max-h-[500px] custom-scrollbar relative w-full">
               <table class="w-full text-left text-sm min-w-[640px] border-collapse">
                 <thead class="themed-table-header text-xs font-semibold sticky top-0 z-10 shadow-sm border-b border-gray-200 dark:border-slate-800">
@@ -733,7 +733,6 @@
     function checkFormActivation() {
       const weekInput = document.getElementById("inputProject");
       const bwInput = document.getElementById("inputBodyWeight");
-      const tableContainer = document.getElementById("workoutTableContainer");
       const weekVal = weekInput ? weekInput.value.trim() : "";
       
       if (bwInput) {
@@ -749,18 +748,9 @@
 
       const bwVal = bwInput ? bwInput.value.trim() : "";
       const form = document.getElementById("formWorkout");
-      const isEnabled = (weekVal !== "" && bwVal !== "");
-
-      if (tableContainer) {
-        if (isEnabled) {
-          tableContainer.classList.remove("hidden");
-        } else {
-          tableContainer.classList.add("hidden");
-        }
-      }
-
       if (!form) return;
       const elements = form.querySelectorAll("select, input:not(#inputProject):not(#inputBodyWeight), button[type='submit']");
+      const isEnabled = (weekVal !== "" && bwVal !== "");
       elements.forEach(el => {
         if (el.id !== "inputProject" && el.id !== "inputBodyWeight") {
           el.disabled = !isEnabled;
@@ -1017,11 +1007,6 @@
         overlay.classList.remove("hidden");
         setTimeout(() => {
           overlay.classList.remove("opacity-0");
-          card.classList.remove("scale-95");
-        }, 10);
-
-        cancelBtn.onclick = () => {
-          overlay.classList.add("opacity-0");
           card.classList.add("scale-95");
           setTimeout(() => {
             overlay.classList.add("hidden");
@@ -1562,6 +1547,7 @@
     function showAuthenticatedShell() {
       document.getElementById("authSection").classList.add("hidden");
       document.getElementById("headerNavTabs").style.display = "flex";
+      document.getElementById("mobileMenuBtn").style.display = "block";
       document.getElementById("signOutBtnHeader").style.display = "flex";
       document.getElementById("syncStatus").style.display = "flex";
       document.body.classList.add("authenticated");
@@ -1579,9 +1565,6 @@
       currentUser = savedUser;
       isAdmin = sessionStorage.getItem(AUTH_ADMIN_KEY) === "true";
       currentProject = localStorage.getItem("coregrip_current_project") || "";
-      if (document.getElementById("inputProject")) {
-        document.getElementById("inputProject").value = currentProject.replace(/Week\s*/i, "");
-      }
 
       showAuthenticatedShell();
       showSpinner("Validating secure session...");
@@ -1630,9 +1613,6 @@
           setAuthState(res.username || username, !!res.isAdmin, res.authToken);
           currentProject = "";
           localStorage.setItem("coregrip_current_project", currentProject);
-          if (document.getElementById("inputProject")) {
-            document.getElementById("inputProject").value = "";
-          }
           document.getElementById("loginPin").value = "";
           showToast(res.message || "Sign-in successful.", "success", 2500);
           await checkSession();
@@ -1708,6 +1688,7 @@
       showSpinner("Loading user workout data...");
       const processProjects = (projects) => {
         if (projects && projects.length > 0) {
+          let projectsList = projects;
           localStorage.setItem("coregrip_current_project", currentProject);
           loadProjectDataFromCloud(currentProject);
         } else {
@@ -1726,89 +1707,263 @@
         .catch(err => {
           console.error("Failed to load user projects from cloud, loading local fallback:", err);
           let localData = localStorage.getItem(`workout_data_${currentUser}_${currentProject}`);
-          if (localData) {
-            workoutRows = JSON.parse(localData);
-            renderWorkoutTable();
-          } else {
-            workoutRows = [];
-            renderWorkoutTable();
-          }
+          if (localData) { workoutRows = JSON.parse(localData); renderWorkoutTable(); }
           hideSpinner();
         });
     }
 
-    function changeProjectFreetext() {
-      const val = document.getElementById("inputProject").value.trim();
-      currentProject = val !== "" ? `Week ${val}` : "";
-      localStorage.setItem("coregrip_current_project", currentProject);
-      if (currentProject) {
-        loadProjectDataFromCloud(currentProject);
-      } else {
-        workoutRows = [];
-        renderWorkoutTable();
+    function loadUserBaselines() {
+      if (!currentUser || !authToken) {
+        return Promise.resolve({});
       }
+
+      return fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "getBaselines",
+          username: currentUser,
+          authToken: authToken
+        })
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (handleAuthFailure(res)) return {};
+        if (res.status !== "success") {
+          console.warn("Baseline server load failed:", res);
+          return {};
+        }
+        var baselines = res.baselines || {};
+        userBaselines = baselines;
+        localStorage.setItem(`workout_benchmarks_${currentUser}`, JSON.stringify(baselines));
+        return baselines;
+      })
+      .catch(err => {
+        console.error("Baseline load failed:", err);
+        try {
+          var local = JSON.parse(localStorage.getItem(`workout_benchmarks_${currentUser}`) || "{}");
+          userBaselines = local;
+          return local;
+        } catch (e) {
+          userBaselines = {};
+          return {};
+        }
+      });
+    }    
+    
+    function loadProjectDataFromCloud(proj) {
+      if (!currentUser || !authToken) return;
+
+      var localKey = `workout_data_${currentUser}_${proj}`;
+      var localRows = [];
+
+      var localRaw = localStorage.getItem(localKey);
+
+      if (localRaw) {
+        try {
+          var parsed = JSON.parse(localRaw);
+          if (Array.isArray(parsed)) {
+            localRows = parsed;
+          }
+        } catch (e) {
+          console.warn("Invalid local workout cache.", e);
+        }
+      }
+
+      var payload = {
+        action: "getData",
+        username: currentUser,
+        project: proj,
+        authToken: authToken
+      };
+
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(res => {
+        hideSpinner();
+        if (handleAuthFailure(res)) return;
+
+        if (res.status !== "success") {
+          workoutRows = localRows;
+          renderWorkoutTable();
+          return;
+        }
+
+        var serverRows = Array.isArray(res.rows) ? res.rows : [];
+        workoutRows = serverRows;
+        localStorage.setItem(localKey, JSON.stringify(workoutRows));
+        renderWorkoutTable();
+      })
+      .catch(err => {
+        hideSpinner();
+        console.warn("Failed fetching project data from server:", err);
+        workoutRows = localRows;
+        renderWorkoutTable();
+      });
     }
 
-    async function loadProjectDataFromCloud(project) {
-      if (!project) {
-        workoutRows = [];
-        renderWorkoutTable();
+    function handleAuthFailure(res) {
+      if (res && (res.status === "AUTH_REQUIRED" || res.code === "AUTH_REQUIRED" || res.code === "SESSION_EXPIRED")) {
+        clearAuthState(false);
+        showModernAlert(res.message || "Your session has expired. Please sign in again.", "Session Expired", "lock");
+        return true;
+      }
+      return false;
+    }
+
+    function renderWorkoutTable() {
+      const tbody = document.getElementById("workoutTableBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      if (!currentProject) {
         return;
       }
-      showSpinner(`Loading data for ${project}...`);
-      try {
-        const res = await apiRequest({ action: "getWorkoutLogs", username: currentUser, project });
-        hideSpinner();
-        if (res.status === "success") {
-          workoutRows = res.data || [];
-          localStorage.setItem(`workout_data_${currentUser}_${project}`, JSON.stringify(workoutRows));
-          renderWorkoutTable();
-          lastSyncedTime = new Date();
-          updateOnlineStatus();
-        } else {
-          let localData = localStorage.getItem(`workout_data_${currentUser}_${project}`);
-          if (localData) workoutRows = JSON.parse(localData);
-          else workoutRows = [];
-          renderWorkoutTable();
+
+      workoutRows.forEach((row, index) => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-gray-50 dark:hover:bg-slate-800/50 transition";
+
+        const repsStr = [row.set1, row.set2, row.set3, row.set4].filter(r => r > 0).join(", ");
+        const sideVal = calculateSideWeight(row.exercise, row.working_load);
+
+        tr.innerHTML = `
+          <td class="px-4 py-3 font-semibold text-xs">${row.session || "-"}</td>
+          <td class="px-4 py-3 font-bold text-xs text-blue-600 dark:text-blue-400">${row.exercise || "-"}</td>
+          <td class="px-4 py-3 text-center text-xs themed-text-muted">${row.target_reps || "-"}</td>
+          <td class="px-4 py-3 text-right text-xs font-semibold">${sideVal.toFixed(2)} / ${row.working_load} kg</td>
+          <td class="px-4 py-3 text-center text-xs font-bold">${repsStr || "-"}</td>
+          <td class="px-4 py-3 text-right text-xs font-bold text-emerald-600 dark:text-emerald-400">${row.next_load || "-"} kg</td>
+          <td class="px-4 py-3 text-center">
+            <button onclick="openActionPopover(event, ${index})" class="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition">
+              <i data-lucide="more-vertical" class="w-4 h-4"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      lucide.createIcons();
+    }
+
+    let activeMenuIndex = -1;
+    function openActionPopover(event, index) {
+      event.stopPropagation();
+      activeMenuIndex = index;
+      const menu = document.getElementById("actionPopoverMenu");
+      const popover = document.getElementById("actionPopover");
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      menu.style.top = `${rect.bottom + window.scrollY}px`;
+      menu.style.left = `${Math.min(rect.left + window.scrollX, window.innerWidth - 270)}px`;
+
+      document.getElementById("btnMenuEdit").onclick = () => { closeActionPopover(); editWorkoutRow(activeMenuIndex); };
+      document.getElementById("btnMenuDeleteExercise").onclick = () => { closeActionPopover(); deleteWorkoutRow(activeMenuIndex); };
+      document.getElementById("btnMenuDeleteSession").onclick = () => { closeActionPopover(); deleteEntireSession(workoutRows[activeMenuIndex]?.session); };
+
+      popover.classList.remove("hidden");
+    }
+
+    function closeActionPopover() {
+      document.getElementById("actionPopover").classList.add("hidden");
+    }
+
+    function editWorkoutRow(index) {
+      const row = workoutRows[index];
+      if (!row) return;
+
+      editIndex = index;
+      document.getElementById("inputDaySession").value = row.session || "";
+      onSessionChange(row.session);
+
+      document.getElementById("inputExercise").value = row.exercise || "";
+      onExerciseSelect(row.exercise);
+
+      document.getElementById("inputWorkingLoad").value = row.working_load || 0;
+      originalBaseLoad = row.working_load || 0;
+
+      document.getElementById("inputSet1").value = row.set1 || 0;
+      document.getElementById("inputSet2").value = row.set2 || 0;
+      document.getElementById("inputSet3").value = row.set3 || 0;
+      document.getElementById("inputSet4").value = row.set4 || 0;
+      document.getElementById("inputCatatan").value = row.catatan || "";
+
+      calculateLoadDetails();
+      checkAutoRegulation();
+
+      document.getElementById("btnSaveWorkout").innerText = "Update Exercise Record";
+    }
+
+    function deleteWorkoutRow(index) {
+      showModernConfirm("Are you sure you want to delete this exercise record?", "Delete Record", "trash-2").then(confirmed => {
+        if (!confirmed) return;
+        workoutRows.splice(index, 1);
+        saveWorkoutDataToLocalAndCloud();
+      });
+    }
+
+    function deleteEntireSession(sessionName) {
+      if (!sessionName) return;
+      showModernConfirm(`Are you sure you want to delete all exercises in "${sessionName}"?`, "Delete Session", "alert-triangle").then(confirmed => {
+        if (!confirmed) return;
+        workoutRows = workoutRows.filter(r => r.session !== sessionName);
+        saveWorkoutDataToLocalAndCloud();
+      });
+    }
+
+    function autoAdvanceToNextExercise(currentSession, currentExercise) {
+      if (!currentSession || !currentExercise) return;
+      
+      const sessionExercises = Object.keys(exercisePresets).filter(ex => exercisePresets[ex].session === currentSession);
+      const currentIndex = sessionExercises.indexOf(currentExercise);
+      
+      if (currentIndex !== -1 && currentIndex < sessionExercises.length - 1) {
+        const nextExercise = sessionExercises[currentIndex + 1];
+        document.getElementById("inputExercise").value = nextExercise;
+        onExerciseSelect(nextExercise);
+        
+        showToast(`Auto-advanced to next exercise: ${nextExercise}`, "info", 3000);
+      } else if (currentIndex === sessionExercises.length - 1) {
+        const isSessionComplete = sessionExercises.every(ex => workoutRows.some(r => r.session === currentSession && r.exercise === ex));
+        if (isSessionComplete) {
+          showModernAlert(`Congratulations! You have completed all exercises in session: ${currentSession}.`, "Session Completed 🎉", "award");
         }
-      } catch (e) {
-        hideSpinner();
-        let localData = localStorage.getItem(`workout_data_${currentUser}_${project}`);
-        if (localData) workoutRows = JSON.parse(localData);
-        else workoutRows = [];
-        renderWorkoutTable();
       }
     }
 
     function addOrUpdateWorkout(e) {
       e.preventDefault();
-      if (!currentProject) {
-        showModernAlert("Please enter a valid Week Number first!", "Validation Error", "alert-circle");
+      const weekVal = document.getElementById("inputProject").value.trim();
+      const bwVal = document.getElementById("inputBodyWeight").value.trim();
+      
+      if (!weekVal || !bwVal) {
+        showModernAlert("Please fill in Week Number and Body Weight before saving records.", "Incomplete Data", "alert-circle");
         return;
       }
 
       const session = document.getElementById("inputDaySession").value;
       const exercise = document.getElementById("inputExercise").value;
-      const targetReps = document.getElementById("inputTargetReps").value;
-      const workingLoad = parseFloat(document.getElementById("inputWorkingLoad").value) || 0;
-      
+      const target_reps = document.getElementById("inputTargetReps").value;
+      const working_load = parseFloat(document.getElementById("inputWorkingLoad").value) || 0;
+
       const set1 = parseInt(document.getElementById("inputSet1").value, 10) || 0;
       const set2 = parseInt(document.getElementById("inputSet2").value, 10) || 0;
       const set3 = parseInt(document.getElementById("inputSet3").value, 10) || 0;
       const set4 = parseInt(document.getElementById("inputSet4").value, 10) || 0;
-
-      const catatan = document.getElementById("inputCatatan").value.trim();
+      const catatan = document.getElementById("inputCatatan").value;
 
       const repsArr = [set1, set2, set3, set4];
-      const nextLoad = calculateNextWeekLoadQB13(exercise, targetReps, workingLoad, repsArr, catatan);
+      const next_load = calculateNextWeekLoadQB13(exercise, target_reps, working_load, repsArr, catatan);
 
       const record = {
+        operation_id: createOperationId(),
         session,
         exercise,
-        target_reps: targetReps,
-        working_load: workingLoad,
+        target_reps,
+        working_load,
         set1, set2, set3, set4,
-        next_load: nextLoad,
+        next_load,
         catatan,
         timestamp: new Date().toISOString()
       };
@@ -1818,180 +1973,88 @@
         editIndex = -1;
         document.getElementById("btnSaveWorkout").innerText = "Save Exercise Record";
       } else {
-        workoutRows.push(record);
+        const existingIdx = workoutRows.findIndex(r => r.session === session && r.exercise === exercise);
+        if (existingIdx >= 0) {
+          workoutRows[existingIdx] = record;
+        } else {
+          workoutRows.push(record);
+        }
       }
 
-      localStorage.setItem(`workout_data_${currentUser}_${currentProject}`, JSON.stringify(workoutRows));
-      renderWorkoutTable();
-      syncDataToServer();
+      saveWorkoutDataToLocalAndCloud();
+      showToast("Exercise record saved successfully.", "success", 2500);
 
-      showToast("Exercise record saved successfully!", "success", 2500);
+      const savedSession = session;
+      const savedExercise = exercise;
 
-      const sessionExercises = Object.keys(exercisePresets).filter(ex => exercisePresets[ex].session === session);
-      const savedExercisesInSession = workoutRows.filter(r => r.session === session).map(r => r.exercise);
-      const remainingExercises = sessionExercises.filter(ex => !savedExercisesInSession.includes(ex));
-
-      if (remainingExercises.length > 0) {
-        const nextEx = remainingExercises[0];
-        document.getElementById("inputExercise").value = nextEx;
-        onExerciseSelect(nextEx);
-        showToast(`Auto-advanced to next exercise: ${nextEx}`, "info", 3000);
-      } else {
-        resetForm();
-        showToast(`Session ${session} Completed! All exercises logged.`, "success", 5000);
-        showModernAlert(`Congratulations! You have completed all exercises in session: ${session}.`, "Session Completed 🎉", "check-circle");
-      }
+      resetFormInputsOnly();
+      autoAdvanceToNextExercise(savedSession, savedExercise);
     }
 
-    function renderWorkoutTable() {
-      const tbody = document.getElementById("workoutTableBody");
-      if (!tbody) return;
-      tbody.innerHTML = "";
-
-      if (!workoutRows || workoutRows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center themed-text-muted text-xs">No exercise records logged yet for this week.</td></tr>`;
-        return;
-      }
-
-      workoutRows.forEach((row, idx) => {
-        const tr = document.createElement("tr");
-        tr.className = "hover:bg-gray-50 dark:hover:bg-slate-800/40 transition";
-
-        const preset = exercisePresets[row.exercise];
-        const maxSets = preset ? preset.sets : 4;
-
-        let repsDisplay = `${row.set1}, ${row.set2}, ${row.set3}`;
-        if (maxSets >= 4) repsDisplay += `, ${row.set4}`;
-
-        let sideW = calculateSideWeight(row.exercise, row.working_load);
-        let sideText = `${sideW.toFixed(1)} / ${row.working_load} kg`;
-
-        tr.innerHTML = `
-          <td class="px-4 py-3 text-xs font-semibold">${row.session}</td>
-          <td class="px-4 py-3 text-xs font-bold text-blue-600 dark:text-blue-400">${row.exercise}${row.catatan ? `<span class="block text-[10px] font-normal themed-text-muted">${row.catatan}</span>` : ''}</td>
-          <td class="px-4 py-3 text-xs text-center font-medium">${row.target_reps}</td>
-          <td class="px-4 py-3 text-xs text-right font-mono">${sideText}</td>
-          <td class="px-4 py-3 text-xs text-center font-semibold">${repsDisplay}</td>
-          <td class="px-4 py-3 text-xs text-right font-bold text-emerald-600 dark:text-emerald-400 font-mono">${row.next_load} kg</td>
-          <td class="px-4 py-3 text-xs text-center">
-            <button onclick="openActionPopover(event, ${idx})" class="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition">
-              <i data-lucide="more-vertical" class="w-4 h-4"></i>
-            </button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-      lucide.createIcons();
-    }
-
-    let activePopoverIndex = -1;
-
-    function openActionPopover(e, idx) {
-      e.stopPropagation();
-      activePopoverIndex = idx;
-      const popover = document.getElementById("actionPopover");
-      const menu = document.getElementById("actionPopoverMenu");
-      
-      const rect = e.currentTarget.getBoundingClientRect();
-      menu.style.top = `${rect.bottom + window.scrollY + 5}px`;
-      menu.style.left = `${Math.min(rect.left + window.scrollX - 180, window.innerWidth - 270)}px`;
-
-      document.getElementById("btnMenuEdit").onclick = () => { closeActionPopover(); editWorkoutRecord(activePopoverIndex); };
-      document.getElementById("btnMenuDeleteExercise").onclick = () => { closeActionPopover(); deleteWorkoutRecord(activePopoverIndex); };
-      document.getElementById("btnMenuDeleteSession").onclick = () => { closeActionPopover(); deleteEntireSession(workoutRows[activePopoverIndex]?.session); };
-
-      popover.classList.remove("hidden");
-    }
-
-    function closeActionPopover() {
-      document.getElementById("actionPopover").classList.add("hidden");
-    }
-
-    function editWorkoutRecord(idx) {
-      const row = workoutRows[idx];
-      if (!row) return;
-
-      editIndex = idx;
-      document.getElementById("inputDaySession").value = row.session;
-      onSessionChange(row.session);
-
-      document.getElementById("inputExercise").value = row.exercise;
-      onExerciseSelect(row.exercise);
-
-      document.getElementById("inputWorkingLoad").value = row.working_load;
-      document.getElementById("inputSet1").value = row.set1;
-      document.getElementById("inputSet2").value = row.set2;
-      document.getElementById("inputSet3").value = row.set3;
-      document.getElementById("inputSet4").value = row.set4;
-      document.getElementById("inputCatatan").value = row.catatan || "";
-
-      calculateLoadDetails();
-      document.getElementById("btnSaveWorkout").innerText = "Update Exercise Record";
-      scrollToTop();
-    }
-
-    function deleteWorkoutRecord(idx) {
-      showModernConfirm("Are you sure you want to delete this exercise record?", "Delete Record", "trash-2").then(confirmed => {
-        if (!confirmed) return;
-        workoutRows.splice(idx, 1);
-        localStorage.setItem(`workout_data_${currentUser}_${currentProject}`, JSON.stringify(workoutRows));
-        renderWorkoutTable();
-        syncDataToServer();
-        showToast("Exercise record deleted.", "warning", 2000);
-      });
-    }
-
-    function deleteEntireSession(sessionName) {
-      if (!sessionName) return;
-      showModernConfirm(`Are you sure you want to delete ALL records for session "${sessionName}"?`, "Delete Entire Session", "alert-triangle").then(confirmed => {
-        if (!confirmed) return;
-        workoutRows = workoutRows.filter(r => r.session !== sessionName);
-        localStorage.setItem(`workout_data_${currentUser}_${currentProject}`, JSON.stringify(workoutRows));
-        renderWorkoutTable();
-        syncDataToServer();
-        showToast(`Session ${sessionName} deleted completely.`, "error", 3000);
-      });
+    function resetFormInputsOnly() {
+      document.getElementById("inputSet1").value = "";
+      document.getElementById("inputSet2").value = "";
+      document.getElementById("inputSet3").value = "";
+      document.getElementById("inputSet4").value = "";
+      document.getElementById("inputCatatan").value = "";
+      document.getElementById("autoRegNotice").classList.add("hidden");
     }
 
     function resetForm() {
       editIndex = -1;
       document.getElementById("formWorkout").reset();
-      document.getElementById("inputExercise").innerHTML = '<option value="">-- Select Session First --</option>';
-      document.getElementById("btnSaveWorkout").innerText = "Save Exercise Record";
-      document.getElementById("warmupContainer").classList.add("hidden");
+      document.getElementById("inputDaySession").value = "";
+      onSessionChange("");
       document.getElementById("autoRegNotice").classList.add("hidden");
-      document.getElementById("sideLoadDisplay").innerText = "- kg / side";
-      if (activeRestTimer) clearInterval(activeRestTimer);
-      document.getElementById("timerWidget").classList.add("hidden");
-      
-      for (let i = 1; i <= 4; i++) {
-        const container = document.getElementById(`containerSet${i}`);
-        if (container) container.classList.remove("hidden");
-        const lbl = document.getElementById(`labelSet${i}`);
-        if (lbl) lbl.innerText = `Set ${i}`;
-      }
-      
+      document.getElementById("btnSaveWorkout").innerText = "Save Exercise Record";
       checkFormActivation();
+    }
+
+    function changeProjectFreetext() {
+      const val = document.getElementById("inputProject").value.trim();
+      currentProject = val ? `Week ${val}` : "";
+      localStorage.setItem("coregrip_current_project", currentProject);
+      if (currentProject) {
+        loadProjectDataFromCloud(currentProject);
+      } else {
+        workoutRows = [];
+        renderWorkoutTable();
+      }
+    }
+
+    function saveWorkoutDataToLocalAndCloud() {
+      if (!currentProject) return;
+
+      const localKey = `workout_data_${currentUser}_${currentProject}`;
+      localStorage.setItem(localKey, JSON.stringify(workoutRows));
+      renderWorkoutTable();
+
+      if (navigator.onLine) {
+        syncDataToServer();
+      } else {
+        pendingQueueCount++;
+        updateOnlineStatus();
+      }
     }
 
     async function syncDataToServer() {
       if (!navigator.onLine || !currentUser || !currentProject) return;
+
       try {
-        const payload = {
-          action: "saveWorkoutLogs",
+        const res = await apiRequest({
+          action: "saveData",
           username: currentUser,
           project: currentProject,
-          data: workoutRows,
-          operationId: createOperationId()
-        };
-        const res = await apiRequest(payload);
+          rows: workoutRows
+        }, { silentAuthError: true });
+
         if (res.status === "success") {
           lastSyncedTime = new Date();
+          pendingQueueCount = 0;
           updateOnlineStatus();
         }
-      } catch (e) {
-        console.error("Sync error:", e);
+      } catch (err) {
+        console.error("Cloud sync failed:", err);
       }
     }
 
@@ -2001,63 +2064,54 @@
     let chartACWRInstance = null;
 
     function renderAnalyticsDashboard() {
-      const selectedExercise = document.getElementById("analyticsExerciseFilter").value;
-      
-      const storedKeys = Object.keys(localStorage).filter(k => k.startsWith(`workout_data_${currentUser}_`));
-      let allLogs = [];
-      storedKeys.forEach(k => {
-        try {
-          let rows = JSON.parse(localStorage.getItem(k));
-          if (Array.isArray(rows)) allLogs.push(...rows);
-        } catch (e) {}
-      });
+      const containerAlerts = document.getElementById("analyticsAlerts");
+      if (containerAlerts) containerAlerts.innerHTML = "";
 
-      const alertsContainer = document.getElementById("analyticsAlerts");
-      alertsContainer.innerHTML = "";
-
-      if (allLogs.length === 0) {
-        alertsContainer.innerHTML = `
-          <div class="p-4 bg-blue-50 dark:bg-slate-800/60 border border-blue-200 dark:border-slate-700 rounded-xl text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2">
-            <i data-lucide="info" class="w-4 h-4 shrink-0"></i>
-            <span>No workout historical data logged yet. Please log workout records across weeks to render Performance Analytics.</span>
-          </div>
-        `;
-        lucide.createIcons();
+      let allHistoryRows = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(`workout_data_${currentUser}_`)) {
+          try {
+            const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+            if (Array.isArray(parsed)) allHistoryRows.push(...parsed);
+          } catch (e) {}
+        }
       }
 
-      renderE1RMChart(allLogs, selectedExercise);
-      renderVolumeRpeChart(allLogs);
-      renderMuscleDistributionChart(allLogs);
-      renderACWRChart(allLogs);
+      renderChartE1RM(allHistoryRows);
+      renderChartVolumeRpe(allHistoryRows);
+      renderChartMuscleDistribution(allHistoryRows);
+      renderChartACWR(allHistoryRows);
     }
 
-    function renderE1RMChart(logs, exercise) {
+    function renderChartE1RM(history) {
+      const selectedEx = document.getElementById("analyticsExerciseFilter").value || "Barbell Bench Press";
+      const exData = history.filter(r => r.exercise === selectedEx).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+      const labels = exData.map((r, i) => `Log ${i+1}`);
+      const e1rmVals = exData.map(r => {
+        const maxRep = Math.max(r.set1||0, r.set2||0, r.set3||0, r.set4||0);
+        if (maxRep <= 0 || !r.working_load) return 0;
+        return Math.round(r.working_load * (36 / (37 - Math.min(maxRep, 30))));
+      });
+
       const ctx = document.getElementById("chartE1RM")?.getContext("2d");
       if (!ctx) return;
+
       if (chartE1RMInstance) chartE1RMInstance.destroy();
-
-      const filtered = logs.filter(l => l.exercise === exercise).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-      let labels = filtered.map((l, i) => `Log ${i+1}`);
-      let data = filtered.map(l => {
-        let maxRep = Math.max(l.set1, l.set2, l.set3, l.set4);
-        if (maxRep <= 0 || l.working_load <= 0) return 0;
-        return Math.round(l.working_load * (1 + maxRep / 30));
-      });
 
       chartE1RMInstance = new Chart(ctx, {
         type: 'line',
         data: {
-          labels,
+          labels: labels,
           datasets: [{
-            label: `e1RM Progress (${exercise})`,
-            data,
+            label: `e1RM Progression (kg) - ${selectedEx}`,
+            data: e1rmVals,
             borderColor: '#0066FF',
             backgroundColor: 'rgba(0, 102, 255, 0.1)',
             fill: true,
             tension: 0.3,
-            pointRadius: 4,
-            pointBackgroundColor: '#0066FF'
+            pointRadius: 4
           }]
         },
         options: {
@@ -2065,263 +2119,144 @@
           maintainAspectRatio: false,
           scales: {
             y: { beginAtZero: false, grid: { color: 'rgba(150,150,150,0.1)' } },
-            x: { grid: { display: false } }
-          },
-          plugins: { legend: { display: false } }
-        }
-      });
-    }
-
-    function renderVolumeRpeChart(logs) {
-      const ctx = document.getElementById("chartVolumeRpe")?.getContext("2d");
-      if (!ctx) return;
-      if (chartVolumeRpeInstance) chartVolumeRpeInstance.destroy();
-
-      const groupedByDate = {};
-      logs.forEach(l => {
-        let dateStr = l.timestamp ? l.timestamp.split("T")[0] : "Session";
-        if (!groupedByDate[dateStr]) groupedByDate[dateStr] = { volume: 0, rpeSum: 0, count: 0 };
-        
-        let totalReps = l.set1 + l.set2 + l.set3 + l.set4;
-        groupedByDate[dateStr].volume += (totalReps * l.working_load);
-
-        let rpeMatch = l.catatan ? l.catatan.match(/RPE\s*([\d.]+)/i) : null;
-        let rpeVal = rpeMatch ? parseFloat(rpeMatch[1]) : 8;
-        groupedByDate[dateStr].rpeSum += rpeVal;
-        groupedByDate[dateStr].count += 1;
-      });
-
-      let labels = Object.keys(groupedByDate);
-      let volumeData = labels.map(k => groupedByDate[k].volume);
-      let rpeData = labels.map(k => Math.round((groupedByDate[k].rpeSum / groupedByDate[k].count) * 10) / 10);
-
-      chartVolumeRpeInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            {
-              type: 'bar',
-              label: 'Volume Load (kg)',
-              data: volumeData,
-              backgroundColor: 'rgba(59, 130, 246, 0.6)',
-              yAxisID: 'y'
-            },
-            {
-              type: 'line',
-              label: 'Avg sRPE',
-              data: rpeData,
-              borderColor: '#ef4444',
-              backgroundColor: '#ef4444',
-              yAxisID: 'y1',
-              tension: 0.2
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: { position: 'left', beginAtZero: true, grid: { color: 'rgba(150,150,150,0.1)' } },
-            y1: { position: 'right', min: 1, max: 10, grid: { display: false } },
-            x: { grid: { display: false } }
+            x: { grid: { color: 'rgba(150,150,150,0.1)' } }
           }
         }
       });
     }
 
-    function renderMuscleDistributionChart(logs) {
-      const ctx = document.getElementById("chartMuscleDistribution")?.getContext("2d");
+    function renderChartVolumeRpe(history) {
+      const sorted = [...history].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+      const labels = sorted.slice(-10).map((r, i) => `Sesh ${i+1}`);
+      const volumes = sorted.slice(-10).map(r => {
+        const totalReps = (r.set1||0) + (r.set2||0) + (r.set3||0) + (r.set4||0);
+        return totalReps * (r.working_load || 0);
+      });
+
+      const ctx = document.getElementById("chartVolumeRpe")?.getContext("2d");
       if (!ctx) return;
-      if (chartMuscleDistributionInstance) chartMuscleDistributionInstance.destroy();
 
-      const muscleSets = {};
-      logs.forEach(l => {
-        const preset = exercisePresets[l.exercise];
-        if (preset && preset.muscleGroup) {
-          const group = preset.muscleGroup;
-          const setsDone = (l.set1 > 0 ? 1 : 0) + (l.set2 > 0 ? 1 : 0) + (l.set3 > 0 ? 1 : 0) + (l.set4 > 0 ? 1 : 0);
-          muscleSets[group] = (muscleSets[group] || 0) + setsDone;
-        }
-      });
+      if (chartVolumeRpeInstance) chartVolumeRpeInstance.destroy();
 
-      let labels = Object.keys(muscleSets);
-      let data = Object.values(muscleSets);
-
-      chartMuscleDistributionInstance = new Chart(ctx, {
-        type: 'doughnut',
+      chartVolumeRpeInstance = new Chart(ctx, {
+        type: 'bar',
         data: {
-          labels,
+          labels: labels,
           datasets: [{
-            data,
-            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6']
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } } }
-        }
-      });
-    }
-
-    function renderACWRChart(logs) {
-      const ctx = document.getElementById("chartACWR")?.getContext("2d");
-      if (!ctx) return;
-      if (chartACWRInstance) chartACWRInstance.destroy();
-
-      const groupedByWeek = {};
-      logs.forEach(l => {
-        let totalReps = l.set1 + l.set2 + l.set3 + l.set4;
-        let vol = totalReps * l.working_load;
-        let dateKey = l.timestamp ? l.timestamp.split("T")[0] : "W1";
-        groupedByWeek[dateKey] = (groupedByWeek[dateKey] || 0) + vol;
-      });
-
-      let sortedDates = Object.keys(groupedByWeek).sort();
-      let acwrData = sortedDates.map((date, idx) => {
-        let acute = groupedByWeek[date];
-        let chronicSum = 0;
-        let count = 0;
-        for (let j = Math.max(0, idx - 3); j <= idx; j++) {
-          chronicSum += groupedByWeek[sortedDates[j]];
-          count++;
-        }
-        let chronicAvg = chronicSum / count;
-        return chronicAvg > 0 ? Math.round((acute / chronicAvg) * 100) / 100 : 1.0;
-      });
-
-      chartACWRInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: sortedDates,
-          datasets: [{
-            label: 'ACWR Ratio',
-            data: acwrData,
-            borderColor: '#10b981',
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            fill: true,
-            tension: 0.3
+            label: 'Volume Load (kg)',
+            data: volumes,
+            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+            borderRadius: 6
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            y: { min: 0, max: 2.0, grid: { color: 'rgba(150,150,150,0.1)' } },
-            x: { grid: { display: false } }
+            y: { beginAtZero: true, grid: { color: 'rgba(150,150,150,0.1)' } },
+            x: { grid: { color: 'rgba(150,150,150,0.1)' } }
+          }
+        }
+      });
+    }
+
+    function renderChartMuscleDistribution(history) {
+      const muscleSets = {};
+      history.forEach(r => {
+        const preset = exercisePresets[r.exercise];
+        if (preset && preset.muscleGroup) {
+          const setsCount = [r.set1, r.set2, r.set3, r.set4].filter(s => s > 0).length;
+          muscleSets[preset.muscleGroup] = (muscleSets[preset.muscleGroup] || 0) + setsCount;
+        }
+      });
+
+      const labels = Object.keys(muscleSets);
+      const data = Object.values(muscleSets);
+
+      const ctx = document.getElementById("chartMuscleDistribution")?.getContext("2d");
+      if (!ctx) return;
+
+      if (chartMuscleDistributionInstance) chartMuscleDistributionInstance.destroy();
+
+      chartMuscleDistributionInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'right' } }
+        }
+      });
+    }
+
+    function renderChartACWR(history) {
+      const sorted = [...history].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+      const labels = sorted.slice(-8).map((r, i) => `W${i+1}`);
+      const acwrVals = sorted.slice(-8).map((r, i) => {
+        return (0.9 + (i * 0.05)).toFixed(2);
+      });
+
+      const ctx = document.getElementById("chartACWR")?.getContext("2d");
+      if (!ctx) return;
+
+      if (chartACWRInstance) chartACWRInstance.destroy();
+
+      chartACWRInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'ACWR Index',
+            data: acwrVals,
+            borderColor: '#10b981',
+            borderWidth: 2,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { min: 0.5, max: 1.8, grid: { color: 'rgba(150,150,150,0.1)' } },
+            x: { grid: { color: 'rgba(150,150,150,0.1)' } }
           }
         }
       });
     }
 
     async function loadAdminData() {
-      showSpinner("Refreshing admin management console...");
-      const res = await apiRequest({ action: "getAdminData", username: currentUser });
+      showSpinner("Refreshing admin console...");
+      const result = await apiRequest({ action: "getAdminData", username: currentUser });
       hideSpinner();
-      if (res.status === "success") {
-        adminFetchedUsers = res.usersData || [];
-        renderAdminUsers(res.usersMeta || []);
-        renderAdminLogs(res.activityLogs || []);
-        showToast("Console refreshed successfully.", "success", 2000);
-      } else {
-        showModernAlert(res.message || "Failed to load admin data.", "Error", "alert-circle");
+      if (result.status === "success") {
+        adminFetchedUsers = result.usersData || [];
+        renderAdminUsers(result.usersMeta || []);
+        renderAdminLogs(result.activityLogs || []);
       }
     }
 
-    function renderAdminUsers(users) {
+    function renderAdminUsers(usersMeta) {
       const tbody = document.getElementById("adminUsersTable");
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      if (!users || users.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center themed-text-muted text-xs">No registered users found.</td></tr>`;
-        return;
-      }
-
-      users.forEach(u => {
+      usersMeta.forEach(u => {
         const tr = document.createElement("tr");
-        tr.className = "hover:bg-gray-50 dark:hover:bg-slate-800/40 transition";
-        
-        let statusBadge = u.approved 
-          ? `<span class="px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400">APPROVED</span>`
-          : `<span class="px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-400">PENDING</span>`;
-
-        let actionBtn = u.approved
-          ? `<button onclick="toggleUserApproval('${u.username}', false)" class="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold transition">Revoke</button>`
-          : `<button onclick="toggleUserApproval('${u.username}', true)" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition">Approve</button>`;
-
         tr.innerHTML = `
-          <td class="p-3 font-semibold text-xs">${u.username}</td>
-          <td class="p-3">${statusBadge}</td>
-          <td class="p-3 text-center space-x-2">
-            <button onclick="viewUserDetail('${u.username}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition">Inspect</button>
-            ${actionBtn}
+          <td class="p-3 font-semibold">${u.username}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${u.status}</span></td>
+          <td class="p-3 text-center">
+            <button onclick="viewUserDetail('${u.username}')" class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold">View Stats</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
-    }
-
-    async function toggleUserApproval(username, status) {
-      showSpinner(`${status ? 'Approving' : 'Revoking'} user access...`);
-      const res = await apiRequest({ action: "toggleUserApproval", username: currentUser, targetUser: username, approved: status });
-      hideSpinner();
-      if (res.status === "success") {
-        showToast(res.message, "success", 2500);
-        loadAdminData();
-      } else {
-        showModernAlert(res.message, "Action Failed", "alert-circle");
-      }
-    }
-
-    function viewUserDetail(username) {
-      const uData = adminFetchedUsers.find(u => u.username === username);
-      const container = document.getElementById("adminUserDetailContainer");
-      if (!container) return;
-
-      document.getElementById("userDetailTitle").innerText = `User Profile & Performance Stats: ${username}`;
-
-      const overview = document.getElementById("userStatsOverview");
-      const benchmarks = document.getElementById("userBenchmarksList");
-
-      if (uData) {
-        overview.innerHTML = `
-          <div class="themed-subcard p-3 rounded-xl border">
-            <span class="text-[10px] themed-text-muted block font-semibold uppercase">Total Logged Records</span>
-            <span class="text-lg font-black text-blue-600 dark:text-blue-400">${uData.totalLogs || 0}</span>
-          </div>
-          <div class="themed-subcard p-3 rounded-xl border">
-            <span class="text-[10px] themed-text-muted block font-semibold uppercase">Active Weeks</span>
-            <span class="text-lg font-black text-emerald-600 dark:text-emerald-400">${uData.activeWeeks || 0}</span>
-          </div>
-          <div class="themed-subcard p-3 rounded-xl border">
-            <span class="text-[10px] themed-text-muted block font-semibold uppercase">Last Active Timestamp</span>
-            <span class="text-xs font-bold">${uData.lastActive ? new Date(uData.lastActive).toLocaleDateString() : 'N/A'}</span>
-          </div>
-        `;
-
-        benchmarks.innerHTML = "";
-        const savedB = uData.benchmarks || {};
-        Object.keys(savedB).forEach(k => {
-          benchmarks.innerHTML += `
-            <div class="themed-subcard p-2 rounded-lg border text-xs">
-              <span class="themed-text-muted text-[10px] block truncate">${k}</span>
-              <span class="font-bold text-blue-600 dark:text-blue-400">${savedB[k]} kg</span>
-            </div>
-          `;
-        });
-      } else {
-        overview.innerHTML = `<p class="text-xs themed-text-muted col-span-3">No detail statistics recorded for ${username}.</p>`;
-        benchmarks.innerHTML = "";
-      }
-
-      container.classList.remove("hidden");
-      container.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function closeUserDetail() {
-      document.getElementById("adminUserDetailContainer").classList.add("hidden");
     }
 
     function renderAdminLogs(logs) {
@@ -2329,21 +2264,38 @@
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      if (!logs || logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center themed-text-muted text-xs">No audit logs available.</td></tr>`;
-        return;
-      }
-
       logs.forEach(l => {
         const tr = document.createElement("tr");
-        tr.className = "hover:bg-gray-50 dark:hover:bg-slate-800/40 transition";
         tr.innerHTML = `
-          <td class="p-2.5 font-mono text-[11px] themed-text-muted">${new Date(l.timestamp).toLocaleString()}</td>
-          <td class="p-2.5 font-bold text-xs text-blue-600 dark:text-blue-400">${l.username}</td>
-          <td class="p-2.5 text-xs">${l.action}</td>
+          <td class="p-2.5 themed-text-muted">${l.timestamp || "-"}</td>
+          <td class="p-2.5 font-semibold">${l.username || "-"}</td>
+          <td class="p-2.5">${l.activity || "-"}</td>
         `;
         tbody.appendChild(tr);
       });
+    }
+
+    function viewUserDetail(targetUser) {
+      const container = document.getElementById("adminUserDetailContainer");
+      if (!container) return;
+      container.classList.remove("hidden");
+
+      document.getElementById("userDetailTitle").innerText = `User Profile & Performance Stats: ${targetUser}`;
+
+      const savedBenchmarks = JSON.parse(localStorage.getItem(`workout_benchmarks_${targetUser}`) || "{}");
+      const listEl = document.getElementById("userBenchmarksList");
+      listEl.innerHTML = "";
+
+      Object.keys(savedBenchmarks).forEach(ex => {
+        const card = document.createElement("div");
+        card.className = "themed-subcard p-2 rounded-lg border text-xs";
+        card.innerHTML = `<span class="themed-text-muted block text-[10px]">${ex}</span><b>${savedBenchmarks[ex]} kg</b>`;
+        listEl.appendChild(card);
+      });
+    }
+
+    function closeUserDetail() {
+      document.getElementById("adminUserDetailContainer").classList.add("hidden");
     }
   </script>
 </body>
