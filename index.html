@@ -787,26 +787,32 @@
     }
 
     function toggleMobileDrawer(forceState) {
-      const drawer = document.getElementById("mobileDrawer");
-      const menuBtn = document.getElementById("mobileMenuBtn");
-      if (!drawer) return;
-      if (!document.body.classList.contains("authenticated")) {
-        drawer.classList.remove("is-open");
-        return;
-      }
+  const drawer = document.getElementById("mobileDrawer");
+  const menuBtn = document.getElementById("mobileMenuBtn");
+  if (!drawer) return;
 
-      if (typeof forceState === 'boolean') {
-        drawer.classList.toggle("is-open", forceState);
-      } else {
-        drawer.classList.toggle("is-open");
-      }
+  // Hapus atau komentari jika tidak menggunakan class 'authenticated' pada <body>
+  /*
+  if (!document.body.classList.contains("authenticated")) {
+    drawer.classList.remove("is-open");
+    return;
+  }
+  */
 
-      if (menuBtn) {
-        const isHidden = !drawer.classList.contains("is-open");
-        menuBtn.innerHTML = `<i data-lucide="${isHidden ? 'menu' : 'x'}" class="w-5 h-5"></i>`;
-        lucide.createIcons();
-      }
+  if (typeof forceState === 'boolean') {
+    drawer.classList.toggle("is-open", forceState);
+  } else {
+    drawer.classList.toggle("is-open");
+  }
+
+  if (menuBtn) {
+    const isHidden = !drawer.classList.contains("is-open");
+    menuBtn.innerHTML = `<i data-lucide="${isHidden ? 'menu' : 'x'}" class="w-5 h-5"></i>`;
+    if (window.lucide) {
+      lucide.createIcons();
     }
+  }
+}
 
     window.addEventListener('resize', () => {
       if (window.innerWidth >= 768) {
