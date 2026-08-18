@@ -878,6 +878,13 @@
       return mround2_5(nextLoad);
     }
 
+function createOperationId() {
+  return "CG_" +
+    Date.now().toString(36) +
+    "_" +
+    crypto.randomUUID().replace(/-/g, "");
+}
+    
     function showToast(message, type = "info", duration = 3000) {
       const container = document.getElementById("toastContainer");
       if (!container) return;
@@ -1710,28 +1717,468 @@
           hideSpinner();
         });
     }
-    function loadProjectDataFromCloud(proj) {
-      const payload = { action: "getData", username: currentUser, project: proj };
-      apiRequest(payload, { silentAuthError: true })
-        .then(res => {
-          hideSpinner();
-          if (res.status === "success") {
-            workoutRows = res.rows || [];
-            localStorage.setItem(`workout_data_${currentUser}_${proj}`, JSON.stringify(workoutRows));
-            renderWorkoutTable();
-          } else {
-            if (res.status === "AUTH_REQUIRED" || res.code === "AUTH_REQUIRED") { clearAuthState(); return; }
-            let localData = localStorage.getItem(`workout_data_${currentUser}_${proj}`);
-            if (localData) { workoutRows = JSON.parse(localData); renderWorkoutTable(); }
-          }
+
+function loadUserBaselines() {
+
+  if (
+    !currentUser ||
+    !authToken
+  ) {
+    return Promise.resolve({});
+  }
+
+
+  return fetch(
+    API_URL,
+    {
+
+      method:
+        "POST",
+
+      body:
+        JSON.stringify({
+
+          action:
+            "getBaselines",
+
+          username:
+            currentUser,
+
+          authToken:
+            authToken
+
         })
-        .catch(err => {
-          hideSpinner();
-          let localData = localStorage.getItem(`workout_data_${currentUser}_${proj}`);
-          if (localData) { workoutRows = JSON.parse(localData); renderWorkoutTable(); }
-        });
+
+    }
+  )
+
+  .then(
+    function (res) {
+
+      return res.json();
+
+    }
+  )
+
+  .then(
+    function (res) {
+
+      if (
+        handleAuthFailure(res)
+      ) {
+
+        return {};
+
+      }
+
+
+      if (
+        res.status !==
+        "success"
+      ) {
+
+        console.warn(
+          "Baseline server load failed:",
+          res
+        );
+
+        return {};
+
+      }
+
+
+      var baselines =
+        res.baselines || {};
+
+
+      /*
+       * Server is authoritative.
+       */
+
+      userBaselines =
+        baselines;
+
+
+      localStorage.setItem(
+
+        `workout_benchmarks_${currentUser}`,
+
+        JSON.stringify(
+          baselines
+        )
+
+      );
+
+
+      return baselines;
+
+    }
+  )
+
+  .catch(
+    function (err) {
+
+      console.error(
+        "Baseline load failed:",
+        err
+      );
+
+
+      /*
+       * Offline fallback.
+       */
+
+      try {
+
+        var local =
+          JSON.parse(
+
+            localStorage.getItem(
+              `workout_benchmarks_${currentUser}`
+            ) || "{}"
+
+          );
+
+
+        userBaselines =
+          local;
+
+
+        return local;
+
+      } catch (e) {
+
+        userBaselines =
+          {};
+
+        return {};
+
+      }
+
+    }
+  );
+
+}    
+    
+    function loadProjectDataFromCloud(
+  proj
+) {
+
+  if (
+    !currentUser ||
+    !authToken
+  ) {
+    return;
+  }
+
+
+  var localKey =
+    `workout_data_${currentUser}_${proj}`;
+
+
+  var localRows = [];
+
+
+  /*
+   * Read local cache first.
+   */
+
+  var localRaw =
+    localStorage.getItem(
+      localKey
+    );
+
+
+  if (localRaw) {
+
+    try {
+
+      var parsed =
+        JSON.parse(
+          localRaw
+        );
+
+
+      if (
+        Array.isArray(parsed)
+      ) {
+
+        localRows =
+          parsed;
+
+      }
+
+    } catch (e) {
+
+      console.warn(
+        "Invalid local workout cache.",
+        e
+      );
+
     }
 
+  }
+
+
+  var payload = {
+
+    action:
+      "getData",
+
+    username:
+      currentUser,
+
+    project:
+      proj,
+
+    authToken:
+      authToken
+
+  };
+
+
+  fetch(
+    API_URL,
+    {
+
+      method:
+        "POST",
+
+      body:
+        JSON.stringify(
+          payload
+        )
+
+    }
+  )
+
+  .then(
+    function (res) {
+
+      return res.json();
+
+    }
+  )
+
+  .then(
+    function (res) {
+
+      hideSpinner();
+
+
+      if (
+        handleAuthFailure(res)
+      ) {
+
+        return;
+
+      }
+
+
+      if (
+        res.status !==
+        "success"
+      ) {
+
+        /*
+         * Server failed.
+         * Keep local.
+         */
+
+        workoutRows =
+          localRows;
+
+        renderWorkoutTable();
+
+        return;
+
+      }
+
+
+      var serverRows =
+        Array.isArray(
+          res.rows
+        )
+          ? res.rows
+          : [];
+
+
+      /*
+       * IMPORTANT:
+       *
+       * Empty server + non-empty local
+       * does NOT mean local data should
+       * be deleted.
+       */
+
+      if (
+        serverRows.length > 0
+      ) {
+
+        /*
+         * Server has authoritative data.
+         */
+
+        workoutRows =
+          serverRows;
+
+
+        localStorage.setItem(
+
+          localKey,
+
+          JSON.stringify(
+            workoutRows
+          )
+
+        );
+
+
+      } else if (
+        localRows.length > 0
+      ) {
+
+        /*
+         * Server empty but local has data.
+         *
+         * Keep local data and synchronize
+         * it back to server.
+         */
+
+        workoutRows =
+          localRows;
+
+
+        renderWorkoutTable();
+
+
+        syncDataToServer();
+
+
+        return;
+
+
+      } else {
+
+        workoutRows =
+          [];
+
+        localStorage.setItem(
+          localKey,
+          "[]"
+        );
+
+      }
+
+
+      renderWorkoutTable();
+
+
+      /*
+       * Update project list if available.
+       */
+
+      if (
+        Array.isArray(
+          res.projects
+        )
+      ) {
+
+        projects =
+          res.projects;
+
+      }
+
+    }
+  )
+
+  .catch(
+    function (err) {
+
+      console.error(
+        "Unable to load workout data:",
+        err
+      );
+
+
+      hideSpinner();
+
+
+      /*
+       * Network failure:
+       * LOCAL remains source of truth
+       * until cloud is reachable.
+       */
+
+      workoutRows =
+        localRows;
+
+
+      renderWorkoutTable();
+
+    }
+  );
+
+}
+
+function loadLocalWorkoutData(
+  proj
+) {
+
+  var key =
+    `workout_data_${currentUser}_${proj}`;
+
+
+  var raw =
+    localStorage.getItem(
+      key
+    );
+
+
+  if (!raw) {
+
+    workoutRows =
+      [];
+
+    renderWorkoutTable();
+
+    return;
+
+  }
+
+
+  try {
+
+    var rows =
+      JSON.parse(
+        raw
+      );
+
+
+    workoutRows =
+      Array.isArray(rows)
+        ? rows
+        : [];
+
+
+  } catch (e) {
+
+    console.error(
+      "Invalid local workout data:",
+      e
+    );
+
+
+    workoutRows =
+      [];
+
+  }
+
+
+  renderWorkoutTable();
+
+}
+    
     function renderWorkoutTable() {
       const tbody = document.getElementById("workoutTableBody");
       if (!tbody) return;
@@ -1919,25 +2366,186 @@
     }
 
     function syncDataToServer() {
-      if (!navigator.onLine) {
-        pendingQueueCount++; updateOnlineStatus(); return;
-      }
-      if (!authToken || !currentUser) {
-        pendingQueueCount++; updateOnlineStatus(); return;
-      }
-      const payload = { action: "saveData", username: currentUser, project: currentProject, rows: workoutRows };
-      apiRequest(payload, { silentAuthError: true })
-        .then(res => {
-          if (res.status === "success") {
-            lastSyncedTime = new Date(); pendingQueueCount = 0; updateOnlineStatus();
-          } else if (res.status === "AUTH_REQUIRED" || res.code === "AUTH_REQUIRED") {
-            clearAuthState();
-          } else {
-            pendingQueueCount++; updateOnlineStatus();
-          }
-        })
-        .catch(err => { console.error("Cloud sync failed:", err); pendingQueueCount++; updateOnlineStatus(); });
+
+  if (
+    !currentUser ||
+    !authToken ||
+    !currentProject
+  ) {
+    return;
+  }
+
+
+  /*
+   * ALWAYS save local first.
+   */
+
+  localStorage.setItem(
+
+    `workout_data_${currentUser}_${currentProject}`,
+
+    JSON.stringify(
+      workoutRows
+    )
+
+  );
+
+
+  /*
+   * Offline mode.
+   */
+
+  if (!navigator.onLine) {
+
+    pendingQueueCount++;
+
+    updateOnlineStatus();
+
+    return;
+
+  }
+
+
+  var operationId =
+    createOperationId();
+
+
+  var payload = {
+
+    action:
+      "saveData",
+
+    username:
+      currentUser,
+
+    authToken:
+      authToken,
+
+    project:
+      currentProject,
+
+    rows:
+      workoutRows,
+
+    operationId:
+      operationId
+
+  };
+
+
+  fetch(
+    API_URL,
+    {
+
+      method:
+        "POST",
+
+      body:
+        JSON.stringify(
+          payload
+        )
+
     }
+  )
+
+  .then(
+    function (res) {
+
+      return res.json();
+
+    }
+  )
+
+  .then(
+    function (res) {
+
+      if (
+        handleAuthFailure(res)
+      ) {
+
+        return;
+
+      }
+
+
+      if (
+        res.status ===
+        "success"
+      ) {
+
+        lastSyncedTime =
+          new Date();
+
+        pendingQueueCount =
+          0;
+
+        updateOnlineStatus();
+
+
+        /*
+         * Keep exact local snapshot.
+         */
+
+        localStorage.setItem(
+
+          `workout_data_${currentUser}_${currentProject}`,
+
+          JSON.stringify(
+            workoutRows
+          )
+
+        );
+
+
+        showToast(
+
+          "Workout synchronized successfully.",
+
+          "success",
+
+          1500
+
+        );
+
+
+      } else {
+
+        console.error(
+          "Workout synchronization rejected:",
+          res
+        );
+
+
+        pendingQueueCount++;
+
+        updateOnlineStatus();
+
+      }
+
+    }
+  )
+
+  .catch(
+    function (err) {
+
+      console.error(
+        "Cloud sync failed:",
+        err
+      );
+
+
+      /*
+       * DO NOT erase local data.
+       */
+
+      pendingQueueCount++;
+
+      updateOnlineStatus();
+
+    }
+  );
+
+}
 
     function changeProjectFreetext() {
       const weekNum = document.getElementById("inputProject").value.trim();
