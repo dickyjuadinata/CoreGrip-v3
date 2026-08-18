@@ -202,7 +202,14 @@
 </head>
 <body class="font-sans min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white relative overflow-x-hidden w-full">
 
-  <!-- Header & Navigation -->
+  perbaiki kode terlampir:
+1. pada browser pc, drawer/hamburger jangan aktif/tersembunyi dan navbar aktif
+2. pada browser mobile, drawer/hamburger harus aktif/terlihat dan navbar tersembunyi
+3. tombol navbar dan sign out hanya aktif di navbar setelah login
+
+Sesuaikan permintaan diatas pada kode terlampir dan hanya modifikasi bagian yang diminta, jangan mengubah struktur dasar, logika lain, maupun fungsionalitas di luar modul yang diminta.  
+
+<!-- Header & Navigation -->
   <header class="themed-header border-b border-gray-800 shadow-sm sticky top-0 z-40 w-full transition-colors duration-300">
     <div class="max-w-7xl mx-auto px-4 py-2.5 flex justify-between items-center w-full h-14">
       <div class="flex items-center space-x-6">
@@ -654,16 +661,16 @@
     <div id="actionPopoverMenu" class="absolute bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden w-64 transition-all duration-200" onclick="event.stopPropagation()">
       <div class="p-1 space-y-1 text-xs font-semibold">
         <button id="btnMenuEdit" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700/70 flex items-center gap-2.5 transition text-slate-700 dark:text-slate-200">
-          <span class="text-base">✏️</span> Edit Exercise
+          <span class="text-base"></span> Edit Exercise
         </button>
         <button id="btnMenuDeleteExercise" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700/70 flex items-center gap-2.5 transition text-slate-700 dark:text-slate-200">
-          <span class="text-base">🗑️</span> Delete Exercise
+          <span class="text-base"></span> Delete Exercise
         </button>
       </div>
       <div class="border-t border-gray-200 dark:border-slate-700/80 my-0.5"></div>
       <div class="p-1">
         <button id="btnMenuDeleteSession" class="w-full text-left px-3.5 py-2.5 rounded-xl text-[#EF4444] hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center gap-2.5 transition font-semibold">
-          <span class="text-base">🚨</span> Delete Entire Session
+          <span class="text-base"></span> Delete Entire Session
         </button>
       </div>
     </div>
