@@ -761,6 +761,15 @@
           }
         }
       });
+
+      const tableContainer = document.querySelector("#tabWorkout .relative.themed-card");
+      if (tableContainer) {
+        if (!isEnabled) {
+          tableContainer.classList.add("hidden");
+        } else {
+          tableContainer.classList.remove("hidden");
+        }
+      }
     }
 
     function toggleMobileDrawer(forceState) {
@@ -878,12 +887,12 @@
       return mround2_5(nextLoad);
     }
 
-    function createOperationId() {
-      return "CG_" +
-        Date.now().toString(36) +
-        "_" +
-        crypto.randomUUID().replace(/-/g, "");
-    }
+function createOperationId() {
+  return "CG_" +
+    Date.now().toString(36) +
+    "_" +
+    crypto.randomUUID().replace(/-/g, "");
+}
     
     function showToast(message, type = "info", duration = 3000) {
       const container = document.getElementById("toastContainer");
@@ -1007,6 +1016,11 @@
         overlay.classList.remove("hidden");
         setTimeout(() => {
           overlay.classList.remove("opacity-0");
+          card.classList.remove("scale-95");
+        }, 10);
+
+        cancelBtn.onclick = () => {
+          overlay.classList.add("opacity-0");
           card.classList.add("scale-95");
           setTimeout(() => {
             overlay.classList.add("hidden");
@@ -1133,6 +1147,48 @@
         document.getElementById("inputWorkingLoad").value = autoLoad;
 
         calculateLoadDetails();
+      }
+    }
+
+    function autoAdvanceToNextExercise() {
+      const currentSession = document.getElementById("inputDaySession").value;
+      const currentExercise = document.getElementById("inputExercise").value;
+      if (!currentSession) return;
+
+      const sessionExercises = Object.keys(exercisePresets).filter(ex => exercisePresets[ex].session === currentSession);
+      const savedInSession = workoutRows.filter(r => r.day_session === currentSession).map(r => r.exercise);
+
+      const isSessionComplete = sessionExercises.length > 0 && sessionExercises.every(ex => savedInSession.includes(ex));
+
+      if (isSessionComplete) {
+        showToast("Session complete! Great job on finishing all exercises in this session.", "success", 5000);
+        showModernAlert("You have completed all exercises in this session! Outstanding work!", "Session Completed", "check-circle");
+        return;
+      }
+
+      const currentIndex = sessionExercises.indexOf(currentExercise);
+      let nextExercise = "";
+
+      for (let i = currentIndex + 1; i < sessionExercises.length; i++) {
+        if (!savedInSession.includes(sessionExercises[i])) {
+          nextExercise = sessionExercises[i];
+          break;
+        }
+      }
+
+      if (!nextExercise) {
+        for (let i = 0; i < sessionExercises.length; i++) {
+          if (!savedInSession.includes(sessionExercises[i])) {
+            nextExercise = sessionExercises[i];
+            break;
+          }
+        }
+      }
+
+      if (nextExercise) {
+        document.getElementById("inputExercise").value = nextExercise;
+        onExerciseSelect(nextExercise);
+        showToast(`Auto-advanced to next exercise: ${nextExercise}`, "info", 3000);
       }
     }
 
@@ -1707,110 +1763,38 @@
         .catch(err => {
           console.error("Failed to load user projects from cloud, loading local fallback:", err);
           let localData = localStorage.getItem(`workout_data_${currentUser}_${currentProject}`);
-          if (localData) { workoutRows = JSON.parse(localData); renderWorkoutTable(); }
+          workoutRows = localData ? JSON.parse(localData) : [];
+          renderWorkoutTable();
           hideSpinner();
         });
     }
 
-    function loadUserBaselines() {
-      if (!currentUser || !authToken) {
-        return Promise.resolve({});
+    function loadProjectDataFromCloud(projectName) {
+      if (!projectName) {
+        workoutRows = [];
+        renderWorkoutTable();
+        hideSpinner();
+        return;
       }
-
-      return fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "getBaselines",
-          username: currentUser,
-          authToken: authToken
-        })
-      })
-      .then(res => res.json())
-      .then(res => {
-        if (handleAuthFailure(res)) return {};
-        if (res.status !== "success") {
-          console.warn("Baseline server load failed:", res);
-          return {};
-        }
-        var baselines = res.baselines || {};
-        userBaselines = baselines;
-        localStorage.setItem(`workout_benchmarks_${currentUser}`, JSON.stringify(baselines));
-        return baselines;
-      })
-      .catch(err => {
-        console.error("Baseline load failed:", err);
-        try {
-          var local = JSON.parse(localStorage.getItem(`workout_benchmarks_${currentUser}`) || "{}");
-          userBaselines = local;
-          return local;
-        } catch (e) {
-          userBaselines = {};
-          return {};
-        }
-      });
-    }    
-    
-    function loadProjectDataFromCloud(proj) {
-      if (!currentUser || !authToken) return;
-
-      var localKey = `workout_data_${currentUser}_${proj}`;
-      var localRows = [];
-
-      var localRaw = localStorage.getItem(localKey);
-
-      if (localRaw) {
-        try {
-          var parsed = JSON.parse(localRaw);
-          if (Array.isArray(parsed)) {
-            localRows = parsed;
+      apiRequest({ action: "getWorkoutRows", username: currentUser, project_name: projectName }, { silentAuthError: true })
+        .then(res => {
+          hideSpinner();
+          if (res.status === "success") {
+            workoutRows = res.rows || [];
+            localStorage.setItem(`workout_data_${currentUser}_${projectName}`, JSON.stringify(workoutRows));
+            renderWorkoutTable();
+          } else {
+            let localData = localStorage.getItem(`workout_data_${currentUser}_${projectName}`);
+            workoutRows = localData ? JSON.parse(localData) : [];
+            renderWorkoutTable();
           }
-        } catch (e) {
-          console.warn("Invalid local workout cache.", e);
-        }
-      }
-
-      var payload = {
-        action: "getData",
-        username: currentUser,
-        project: proj,
-        authToken: authToken
-      };
-
-      fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify(payload)
-      })
-      .then(res => res.json())
-      .then(res => {
-        hideSpinner();
-        if (handleAuthFailure(res)) return;
-
-        if (res.status !== "success") {
-          workoutRows = localRows;
+        })
+        .catch(err => {
+          hideSpinner();
+          let localData = localStorage.getItem(`workout_data_${currentUser}_${projectName}`);
+          workoutRows = localData ? JSON.parse(localData) : [];
           renderWorkoutTable();
-          return;
-        }
-
-        var serverRows = Array.isArray(res.rows) ? res.rows : [];
-        workoutRows = serverRows;
-        localStorage.setItem(localKey, JSON.stringify(workoutRows));
-        renderWorkoutTable();
-      })
-      .catch(err => {
-        hideSpinner();
-        console.warn("Failed fetching project data from server:", err);
-        workoutRows = localRows;
-        renderWorkoutTable();
-      });
-    }
-
-    function handleAuthFailure(res) {
-      if (res && (res.status === "AUTH_REQUIRED" || res.code === "AUTH_REQUIRED" || res.code === "SESSION_EXPIRED")) {
-        clearAuthState(false);
-        showModernAlert(res.message || "Your session has expired. Please sign in again.", "Session Expired", "lock");
-        return true;
-      }
-      return false;
+        });
     }
 
     function renderWorkoutTable() {
@@ -1818,26 +1802,38 @@
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      if (!currentProject) {
+      if (workoutRows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 themed-text-muted text-xs font-medium">No workout records logged for this session week yet.</td></tr>`;
         return;
       }
 
-      workoutRows.forEach((row, index) => {
+      workoutRows.forEach((row, idx) => {
         const tr = document.createElement("tr");
-        tr.className = "hover:bg-gray-50 dark:hover:bg-slate-800/50 transition";
+        tr.className = "hover:bg-gray-50 dark:hover:bg-slate-800/40 transition-colors";
 
-        const repsStr = [row.set1, row.set2, row.set3, row.set4].filter(r => r > 0).join(", ");
-        const sideVal = calculateSideWeight(row.exercise, row.working_load);
+        let repsDisplay = `${row.set1 || 0}, ${row.set2 || 0}, ${row.set3 || 0}`;
+        if (row.set4 !== undefined && row.set4 !== null && row.set4 > 0) {
+          repsDisplay += `, ${row.set4}`;
+        }
+
+        const sideW = calculateSideWeight(row.exercise, row.working_load);
+        let sideStr = `${sideW.toFixed(1)}k side`;
+        const exLower = row.exercise.toLowerCase();
+        if (exLower.includes("pull-up") || exLower.includes("pull up")) {
+          sideStr = `${sideW.toFixed(1)}k total`;
+        } else if (!exLower.includes("barbell") && !exLower.includes("dumbbell")) {
+          sideStr = "stack";
+        }
 
         tr.innerHTML = `
-          <td class="px-4 py-3 font-semibold text-xs">${row.session || "-"}</td>
-          <td class="px-4 py-3 font-bold text-xs text-blue-600 dark:text-blue-400">${row.exercise || "-"}</td>
-          <td class="px-4 py-3 text-center text-xs themed-text-muted">${row.target_reps || "-"}</td>
-          <td class="px-4 py-3 text-right text-xs font-semibold">${sideVal.toFixed(2)} / ${row.working_load} kg</td>
-          <td class="px-4 py-3 text-center text-xs font-bold">${repsStr || "-"}</td>
-          <td class="px-4 py-3 text-right text-xs font-bold text-emerald-600 dark:text-emerald-400">${row.next_load || "-"} kg</td>
-          <td class="px-4 py-3 text-center">
-            <button onclick="openActionPopover(event, ${index})" class="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition">
+          <td class="px-4 py-3 text-xs font-semibold">${row.day_session || '-'}</td>
+          <td class="px-4 py-3 text-xs font-bold text-blue-600 dark:text-blue-400">${row.exercise || '-'}</td>
+          <td class="px-4 py-3 text-xs text-center font-medium themed-text-muted">${row.target_reps || '-'}</td>
+          <td class="px-4 py-3 text-xs text-right font-bold">${sideStr} / <span class="text-blue-600 dark:text-blue-400">${row.working_load || 0} kg</span></td>
+          <td class="px-4 py-3 text-xs text-center font-semibold">${repsDisplay}</td>
+          <td class="px-4 py-3 text-xs text-right font-black text-emerald-600 dark:text-emerald-400">${row.next_load || 0} kg</td>
+          <td class="px-4 py-3 text-xs text-center">
+            <button onclick="openActionPopover(event, ${idx})" class="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition">
               <i data-lucide="more-vertical" class="w-4 h-4"></i>
             </button>
           </td>
@@ -1847,20 +1843,115 @@
       lucide.createIcons();
     }
 
-    let activeMenuIndex = -1;
-    function openActionPopover(event, index) {
-      event.stopPropagation();
-      activeMenuIndex = index;
-      const menu = document.getElementById("actionPopoverMenu");
+    function addOrUpdateWorkout(e) {
+      e.preventDefault();
+      const weekVal = document.getElementById("inputProject").value.trim();
+      const bwVal = document.getElementById("inputBodyWeight").value.trim();
+      if (!weekVal || !bwVal) {
+        showModernAlert("Please specify Week Number and Body Weight before saving records.", "Validation Error", "alert-circle");
+        return;
+      }
+
+      currentProject = "Week " + weekVal;
+      localStorage.setItem("coregrip_current_project", currentProject);
+
+      const day_session = document.getElementById("inputDaySession").value;
+      const exercise = document.getElementById("inputExercise").value;
+      const target_reps = document.getElementById("inputTargetReps").value;
+      const rest_time = document.getElementById("inputRestTime").value;
+      const working_load = parseFloat(document.getElementById("inputWorkingLoad").value) || 0;
+
+      const set1 = parseInt(document.getElementById("inputSet1").value, 10) || 0;
+      const set2 = parseInt(document.getElementById("inputSet2").value, 10) || 0;
+      const set3 = parseInt(document.getElementById("inputSet3").value, 10) || 0;
+      const set4 = parseInt(document.getElementById("inputSet4").value, 10) || 0;
+      const catatan = document.getElementById("inputCatatan").value.trim();
+
+      const repsArr = [set1, set2, set3, set4];
+      const next_load = calculateNextWeekLoadQB13(exercise, target_reps, working_load, repsArr, catatan);
+
+      const record = {
+        operation_id: createOperationId(),
+        username: currentUser,
+        project_name: currentProject,
+        day_session,
+        exercise,
+        target_reps,
+        rest_time,
+        working_load,
+        set1, set2, set3, set4,
+        next_load,
+        catatan,
+        timestamp: new Date().toISOString()
+      };
+
+      if (editIndex >= 0) {
+        workoutRows[editIndex] = record;
+        editIndex = -1;
+      } else {
+        const existingIdx = workoutRows.findIndex(r => r.exercise === exercise && r.day_session === day_session);
+        if (existingIdx >= 0) {
+          workoutRows[existingIdx] = record;
+        } else {
+          workoutRows.push(record);
+        }
+      }
+
+      localStorage.setItem(`workout_data_${currentUser}_${currentProject}`, JSON.stringify(workoutRows));
+      renderWorkoutTable();
+      showToast("Exercise record saved successfully.", "success", 2500);
+
+      if (navigator.onLine) {
+        apiRequest({ action: "saveWorkoutRow", username: currentUser, record }, { silentAuthError: true });
+      }
+
+      autoAdvanceToNextExercise();
+    }
+
+    function resetForm() {
+      editIndex = -1;
+      document.getElementById("inputDaySession").value = "";
+      document.getElementById("inputExercise").innerHTML = '<option value="">-- Select Session First --</option>';
+      document.getElementById("inputTargetReps").value = "";
+      document.getElementById("inputRestTime").value = "";
+      document.getElementById("inputWorkingLoad").value = "";
+      document.getElementById("inputSet1").value = "";
+      document.getElementById("inputSet2").value = "";
+      document.getElementById("inputSet3").value = "";
+      document.getElementById("inputSet4").value = "";
+      document.getElementById("inputCatatan").value = "";
+      document.getElementById("autoRegNotice").classList.add("hidden");
+      document.getElementById("sideLoadDisplay").innerText = "- kg / side";
+      calculateWarmupPreview(0, "");
+    }
+
+    function changeProjectFreetext() {
+      const val = document.getElementById("inputProject").value.trim();
+      if (!val) {
+        currentProject = "";
+        workoutRows = [];
+        renderWorkoutTable();
+        return;
+      }
+      currentProject = "Week " + val;
+      localStorage.setItem("coregrip_current_project", currentProject);
+      loadProjectDataFromCloud(currentProject);
+    }
+
+    let popoverTargetIndex = -1;
+    function openActionPopover(e, index) {
+      e.stopPropagation();
+      popoverTargetIndex = index;
       const popover = document.getElementById("actionPopover");
+      const menu = document.getElementById("actionPopoverMenu");
+      
+      const rect = e.currentTarget.getBoundingClientRect();
+      menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
+      menu.style.left = `${Math.min(rect.left + window.scrollX - 180, window.innerWidth - 270)}px`;
 
-      const rect = event.currentTarget.getBoundingClientRect();
-      menu.style.top = `${rect.bottom + window.scrollY}px`;
-      menu.style.left = `${Math.min(rect.left + window.scrollX, window.innerWidth - 270)}px`;
-
-      document.getElementById("btnMenuEdit").onclick = () => { closeActionPopover(); editWorkoutRow(activeMenuIndex); };
-      document.getElementById("btnMenuDeleteExercise").onclick = () => { closeActionPopover(); deleteWorkoutRow(activeMenuIndex); };
-      document.getElementById("btnMenuDeleteSession").onclick = () => { closeActionPopover(); deleteEntireSession(workoutRows[activeMenuIndex]?.session); };
+      document.getElementById("btnMenuEdit").onclick = () => { closeActionPopover(); editWorkoutRow(popoverTargetIndex); };
+      document.getElementById("btnMenuDeleteExercise").onclick = () => { closeActionPopover(); deleteWorkoutRow(popoverTargetIndex); };
+      document.getElementById("btnMenuDeleteSession").onclick = () => { closeActionPopover(); deleteEntireSession(popoverTargetIndex); };
 
       popover.classList.remove("hidden");
     }
@@ -1872,17 +1963,15 @@
     function editWorkoutRow(index) {
       const row = workoutRows[index];
       if (!row) return;
-
       editIndex = index;
-      document.getElementById("inputDaySession").value = row.session || "";
-      onSessionChange(row.session);
+
+      document.getElementById("inputDaySession").value = row.day_session || "";
+      onSessionChange(row.day_session);
 
       document.getElementById("inputExercise").value = row.exercise || "";
       onExerciseSelect(row.exercise);
 
       document.getElementById("inputWorkingLoad").value = row.working_load || 0;
-      originalBaseLoad = row.working_load || 0;
-
       document.getElementById("inputSet1").value = row.set1 || 0;
       document.getElementById("inputSet2").value = row.set2 || 0;
       document.getElementById("inputSet3").value = row.set3 || 0;
@@ -1890,354 +1979,181 @@
       document.getElementById("inputCatatan").value = row.catatan || "";
 
       calculateLoadDetails();
-      checkAutoRegulation();
-
-      document.getElementById("btnSaveWorkout").innerText = "Update Exercise Record";
+      showToast("Editing exercise record.", "info", 2000);
     }
 
     function deleteWorkoutRow(index) {
-      showModernConfirm("Are you sure you want to delete this exercise record?", "Delete Record", "trash-2").then(confirmed => {
+      const row = workoutRows[index];
+      if (!row) return;
+      showModernConfirm(`Delete record for ${row.exercise}?`, "Delete Exercise", "trash-2").then(confirmed => {
         if (!confirmed) return;
         workoutRows.splice(index, 1);
-        saveWorkoutDataToLocalAndCloud();
-      });
-    }
-
-    function deleteEntireSession(sessionName) {
-      if (!sessionName) return;
-      showModernConfirm(`Are you sure you want to delete all exercises in "${sessionName}"?`, "Delete Session", "alert-triangle").then(confirmed => {
-        if (!confirmed) return;
-        workoutRows = workoutRows.filter(r => r.session !== sessionName);
-        saveWorkoutDataToLocalAndCloud();
-      });
-    }
-
-    function autoAdvanceToNextExercise(currentSession, currentExercise) {
-      if (!currentSession || !currentExercise) return;
-      
-      const sessionExercises = Object.keys(exercisePresets).filter(ex => exercisePresets[ex].session === currentSession);
-      const currentIndex = sessionExercises.indexOf(currentExercise);
-      
-      if (currentIndex !== -1 && currentIndex < sessionExercises.length - 1) {
-        const nextExercise = sessionExercises[currentIndex + 1];
-        document.getElementById("inputExercise").value = nextExercise;
-        onExerciseSelect(nextExercise);
-        
-        showToast(`Auto-advanced to next exercise: ${nextExercise}`, "info", 3000);
-      } else if (currentIndex === sessionExercises.length - 1) {
-        const isSessionComplete = sessionExercises.every(ex => workoutRows.some(r => r.session === currentSession && r.exercise === ex));
-        if (isSessionComplete) {
-          showModernAlert(`Congratulations! You have completed all exercises in session: ${currentSession}.`, "Session Completed 🎉", "award");
-        }
-      }
-    }
-
-    function addOrUpdateWorkout(e) {
-      e.preventDefault();
-      const weekVal = document.getElementById("inputProject").value.trim();
-      const bwVal = document.getElementById("inputBodyWeight").value.trim();
-      
-      if (!weekVal || !bwVal) {
-        showModernAlert("Please fill in Week Number and Body Weight before saving records.", "Incomplete Data", "alert-circle");
-        return;
-      }
-
-      const session = document.getElementById("inputDaySession").value;
-      const exercise = document.getElementById("inputExercise").value;
-      const target_reps = document.getElementById("inputTargetReps").value;
-      const working_load = parseFloat(document.getElementById("inputWorkingLoad").value) || 0;
-
-      const set1 = parseInt(document.getElementById("inputSet1").value, 10) || 0;
-      const set2 = parseInt(document.getElementById("inputSet2").value, 10) || 0;
-      const set3 = parseInt(document.getElementById("inputSet3").value, 10) || 0;
-      const set4 = parseInt(document.getElementById("inputSet4").value, 10) || 0;
-      const catatan = document.getElementById("inputCatatan").value;
-
-      const repsArr = [set1, set2, set3, set4];
-      const next_load = calculateNextWeekLoadQB13(exercise, target_reps, working_load, repsArr, catatan);
-
-      const record = {
-        operation_id: createOperationId(),
-        session,
-        exercise,
-        target_reps,
-        working_load,
-        set1, set2, set3, set4,
-        next_load,
-        catatan,
-        timestamp: new Date().toISOString()
-      };
-
-      if (editIndex >= 0) {
-        workoutRows[editIndex] = record;
-        editIndex = -1;
-        document.getElementById("btnSaveWorkout").innerText = "Save Exercise Record";
-      } else {
-        const existingIdx = workoutRows.findIndex(r => r.session === session && r.exercise === exercise);
-        if (existingIdx >= 0) {
-          workoutRows[existingIdx] = record;
-        } else {
-          workoutRows.push(record);
-        }
-      }
-
-      saveWorkoutDataToLocalAndCloud();
-      showToast("Exercise record saved successfully.", "success", 2500);
-
-      const savedSession = session;
-      const savedExercise = exercise;
-
-      resetFormInputsOnly();
-      autoAdvanceToNextExercise(savedSession, savedExercise);
-    }
-
-    function resetFormInputsOnly() {
-      document.getElementById("inputSet1").value = "";
-      document.getElementById("inputSet2").value = "";
-      document.getElementById("inputSet3").value = "";
-      document.getElementById("inputSet4").value = "";
-      document.getElementById("inputCatatan").value = "";
-      document.getElementById("autoRegNotice").classList.add("hidden");
-    }
-
-    function resetForm() {
-      editIndex = -1;
-      document.getElementById("formWorkout").reset();
-      document.getElementById("inputDaySession").value = "";
-      onSessionChange("");
-      document.getElementById("autoRegNotice").classList.add("hidden");
-      document.getElementById("btnSaveWorkout").innerText = "Save Exercise Record";
-      checkFormActivation();
-    }
-
-    function changeProjectFreetext() {
-      const val = document.getElementById("inputProject").value.trim();
-      currentProject = val ? `Week ${val}` : "";
-      localStorage.setItem("coregrip_current_project", currentProject);
-      if (currentProject) {
-        loadProjectDataFromCloud(currentProject);
-      } else {
-        workoutRows = [];
+        localStorage.setItem(`workout_data_${currentUser}_${currentProject}`, JSON.stringify(workoutRows));
         renderWorkoutTable();
-      }
-    }
+        showToast("Exercise record deleted.", "warning", 2500);
 
-    function saveWorkoutDataToLocalAndCloud() {
-      if (!currentProject) return;
-
-      const localKey = `workout_data_${currentUser}_${currentProject}`;
-      localStorage.setItem(localKey, JSON.stringify(workoutRows));
-      renderWorkoutTable();
-
-      if (navigator.onLine) {
-        syncDataToServer();
-      } else {
-        pendingQueueCount++;
-        updateOnlineStatus();
-      }
-    }
-
-    async function syncDataToServer() {
-      if (!navigator.onLine || !currentUser || !currentProject) return;
-
-      try {
-        const res = await apiRequest({
-          action: "saveData",
-          username: currentUser,
-          project: currentProject,
-          rows: workoutRows
-        }, { silentAuthError: true });
-
-        if (res.status === "success") {
-          lastSyncedTime = new Date();
-          pendingQueueCount = 0;
-          updateOnlineStatus();
+        if (navigator.onLine) {
+          apiRequest({ action: "deleteWorkoutRow", username: currentUser, project_name: currentProject, exercise: row.exercise }, { silentAuthError: true });
         }
-      } catch (err) {
-        console.error("Cloud sync failed:", err);
-      }
+      });
+    }
+
+    function deleteEntireSession(index) {
+      const row = workoutRows[index];
+      if (!row) return;
+      const session = row.day_session;
+      showModernConfirm(`Delete ALL exercise records for session "${session}"?`, "Delete Entire Session", "alert-triangle").then(confirmed => {
+        if (!confirmed) return;
+        workoutRows = workoutRows.filter(r => r.day_session !== session);
+        localStorage.setItem(`workout_data_${currentUser}_${currentProject}`, JSON.stringify(workoutRows));
+        renderWorkoutTable();
+        showToast(`All records for ${session} removed.`, "warning", 2500);
+
+        if (navigator.onLine) {
+          apiRequest({ action: "deleteSessionRows", username: currentUser, project_name: currentProject, day_session: session }, { silentAuthError: true });
+        }
+      });
     }
 
     let chartE1RMInstance = null;
     let chartVolumeRpeInstance = null;
-    let chartMuscleDistributionInstance = null;
+    let chartMuscleDistInstance = null;
     let chartACWRInstance = null;
 
     function renderAnalyticsDashboard() {
-      const containerAlerts = document.getElementById("analyticsAlerts");
-      if (containerAlerts) containerAlerts.innerHTML = "";
+      const alertsEl = document.getElementById("analyticsAlerts");
+      alertsEl.innerHTML = "";
 
-      let allHistoryRows = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(`workout_data_${currentUser}_`)) {
-          try {
-            const parsed = JSON.parse(localStorage.getItem(key) || "[]");
-            if (Array.isArray(parsed)) allHistoryRows.push(...parsed);
-          } catch (e) {}
+      let historyAllWeeks = [];
+      for (let i = 1; i <= 12; i++) {
+        let pName = `Week ${i}`;
+        let localData = localStorage.getItem(`workout_data_${currentUser}_${pName}`);
+        if (localData) {
+          let rows = JSON.parse(localData);
+          rows.forEach(r => historyAllWeeks.push({ ...r, weekNum: i }));
         }
       }
 
-      renderChartE1RM(allHistoryRows);
-      renderChartVolumeRpe(allHistoryRows);
-      renderChartMuscleDistribution(allHistoryRows);
-      renderChartACWR(allHistoryRows);
-    }
+      if (historyAllWeeks.length === 0 && workoutRows.length > 0) {
+        workoutRows.forEach(r => historyAllWeeks.push({ ...r, weekNum: 1 }));
+      }
 
-    function renderChartE1RM(history) {
-      const selectedEx = document.getElementById("analyticsExerciseFilter").value || "Barbell Bench Press";
-      const exData = history.filter(r => r.exercise === selectedEx).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+      const filterEx = document.getElementById("analyticsExerciseFilter").value;
+      const exData = historyAllWeeks.filter(r => r.exercise === filterEx).sort((a,b) => a.weekNum - b.weekNum);
 
-      const labels = exData.map((r, i) => `Log ${i+1}`);
-      const e1rmVals = exData.map(r => {
-        const maxRep = Math.max(r.set1||0, r.set2||0, r.set3||0, r.set4||0);
-        if (maxRep <= 0 || !r.working_load) return 0;
-        return Math.round(r.working_load * (36 / (37 - Math.min(maxRep, 30))));
+      const labels = exData.map(d => `Week ${d.weekNum}`);
+      const e1rmValues = exData.map(d => {
+        const topReps = Math.max(d.set1 || 0, d.set2 || 0, d.set3 || 0, d.set4 || 0);
+        if (topReps <= 0) return 0;
+        return Math.round(d.working_load * (1 + 0.0333 * topReps));
       });
-
-      const ctx = document.getElementById("chartE1RM")?.getContext("2d");
-      if (!ctx) return;
 
       if (chartE1RMInstance) chartE1RMInstance.destroy();
+      const ctx1 = document.getElementById("chartE1RM")?.getContext("2d");
+      if (ctx1) {
+        chartE1RMInstance = new Chart(ctx1, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: `${filterEx} e1RM (kg)`,
+              data: e1rmValues,
+              borderColor: '#0066FF',
+              backgroundColor: 'rgba(0, 102, 255, 0.1)',
+              fill: true,
+              tension: 0.3,
+              borderWidth: 2,
+              pointRadius: 4
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } } }
+        });
+      }
 
-      chartE1RMInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: `e1RM Progression (kg) - ${selectedEx}`,
-            data: e1rmVals,
-            borderColor: '#0066FF',
-            backgroundColor: 'rgba(0, 102, 255, 0.1)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: { beginAtZero: false, grid: { color: 'rgba(150,150,150,0.1)' } },
-            x: { grid: { color: 'rgba(150,150,150,0.1)' } }
-          }
-        }
-      });
-    }
-
-    function renderChartVolumeRpe(history) {
-      const sorted = [...history].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
-      const labels = sorted.slice(-10).map((r, i) => `Sesh ${i+1}`);
-      const volumes = sorted.slice(-10).map(r => {
-        const totalReps = (r.set1||0) + (r.set2||0) + (r.set3||0) + (r.set4||0);
-        return totalReps * (r.working_load || 0);
+      const weekGroups = {};
+      historyAllWeeks.forEach(r => {
+        if (!weekGroups[r.weekNum]) weekGroups[r.weekNum] = [];
+        weekGroups[r.weekNum].push(r);
       });
 
-      const ctx = document.getElementById("chartVolumeRpe")?.getContext("2d");
-      if (!ctx) return;
+      const weekLabels = Object.keys(weekGroups).map(w => `Week ${w}`);
+      const volumeLoads = Object.keys(weekGroups).map(w => {
+        return weekGroups[w].reduce((acc, r) => {
+          const totalReps = (r.set1||0) + (r.set2||0) + (r.set3||0) + (r.set4||0);
+          return acc + (r.working_load * totalReps);
+        }, 0);
+      });
 
       if (chartVolumeRpeInstance) chartVolumeRpeInstance.destroy();
+      const ctx2 = document.getElementById("chartVolumeRpe")?.getContext("2d");
+      if (ctx2) {
+        chartVolumeRpeInstance = new Chart(ctx2, {
+          type: 'bar',
+          data: {
+            labels: weekLabels,
+            datasets: [{
+              label: 'Total Volume Load (kg)',
+              data: volumeLoads,
+              backgroundColor: '#3b82f6',
+              borderRadius: 6
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false }
+        });
+      }
 
-      chartVolumeRpeInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Volume Load (kg)',
-            data: volumes,
-            backgroundColor: 'rgba(59, 130, 246, 0.8)',
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: { beginAtZero: true, grid: { color: 'rgba(150,150,150,0.1)' } },
-            x: { grid: { color: 'rgba(150,150,150,0.1)' } }
-          }
-        }
-      });
-    }
-
-    function renderChartMuscleDistribution(history) {
       const muscleSets = {};
-      history.forEach(r => {
+      workoutRows.forEach(r => {
         const preset = exercisePresets[r.exercise];
-        if (preset && preset.muscleGroup) {
-          const setsCount = [r.set1, r.set2, r.set3, r.set4].filter(s => s > 0).length;
-          muscleSets[preset.muscleGroup] = (muscleSets[preset.muscleGroup] || 0) + setsCount;
-        }
+        const group = preset ? preset.muscleGroup : 'Other';
+        const setsCount = (r.set1>0?1:0) + (r.set2>0?1:0) + (r.set3>0?1:0) + (r.set4>0?1:0);
+        muscleSets[group] = (muscleSets[group] || 0) + setsCount;
       });
 
-      const labels = Object.keys(muscleSets);
-      const data = Object.values(muscleSets);
+      if (chartMuscleDistInstance) chartMuscleDistInstance.destroy();
+      const ctx3 = document.getElementById("chartMuscleDistribution")?.getContext("2d");
+      if (ctx3) {
+        chartMuscleDistInstance = new Chart(ctx3, {
+          type: 'doughnut',
+          data: {
+            labels: Object.keys(muscleSets),
+            datasets: [{
+              data: Object.values(muscleSets),
+              backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6']
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false }
+        });
+      }
 
-      const ctx = document.getElementById("chartMuscleDistribution")?.getContext("2d");
-      if (!ctx) return;
-
-      if (chartMuscleDistributionInstance) chartMuscleDistributionInstance.destroy();
-
-      chartMuscleDistributionInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: labels,
-          datasets: [{
-            data: data,
-            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'right' } }
-        }
+      const acwrValues = volumeLoads.map((vol, i) => {
+        if (i === 0) return 1.0;
+        const chronic = volumeLoads.slice(Math.max(0, i - 3), i + 1).reduce((a,b)=>a+b,0) / Math.min(i + 1, 4);
+        return chronic > 0 ? parseFloat((vol / chronic).toFixed(2)) : 1.0;
       });
-    }
-
-    function renderChartACWR(history) {
-      const sorted = [...history].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
-      const labels = sorted.slice(-8).map((r, i) => `W${i+1}`);
-      const acwrVals = sorted.slice(-8).map((r, i) => {
-        return (0.9 + (i * 0.05)).toFixed(2);
-      });
-
-      const ctx = document.getElementById("chartACWR")?.getContext("2d");
-      if (!ctx) return;
 
       if (chartACWRInstance) chartACWRInstance.destroy();
-
-      chartACWRInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'ACWR Index',
-            data: acwrVals,
-            borderColor: '#10b981',
-            borderWidth: 2,
-            tension: 0.2
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: { min: 0.5, max: 1.8, grid: { color: 'rgba(150,150,150,0.1)' } },
-            x: { grid: { color: 'rgba(150,150,150,0.1)' } }
+      const ctx4 = document.getElementById("chartACWR")?.getContext("2d");
+      if (ctx4) {
+        chartACWRInstance = new Chart(ctx4, {
+          type: 'line',
+          data: {
+            labels: weekLabels,
+            datasets: [{
+              label: 'ACWR Ratio',
+              data: acwrValues,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              fill: true,
+              tension: 0.2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { min: 0.5, max: 2.0 } }
           }
-        }
-      });
-    }
-
-    async function loadAdminData() {
-      showSpinner("Refreshing admin console...");
-      const result = await apiRequest({ action: "getAdminData", username: currentUser });
-      hideSpinner();
-      if (result.status === "success") {
-        adminFetchedUsers = result.usersData || [];
-        renderAdminUsers(result.usersMeta || []);
-        renderAdminLogs(result.activityLogs || []);
+        });
       }
     }
 
@@ -2248,11 +2164,13 @@
 
       usersMeta.forEach(u => {
         const tr = document.createElement("tr");
+        tr.className = "border-b border-gray-200 dark:border-slate-800";
         tr.innerHTML = `
-          <td class="p-3 font-semibold">${u.username}</td>
-          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${u.status}</span></td>
-          <td class="p-3 text-center">
-            <button onclick="viewUserDetail('${u.username}')" class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold">View Stats</button>
+          <td class="p-3 font-bold">${u.username}</td>
+          <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${u.approved ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'}">${u.approved ? 'Approved' : 'Pending'}</span></td>
+          <td class="p-3 text-center space-x-2">
+            ${!u.approved ? `<button onclick="approveUser('${u.username}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition">Approve</button>` : ''}
+            <button onclick="viewUserDetail('${u.username}')" class="px-3 py-1 bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 rounded-lg text-xs font-semibold transition">View Stats</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -2266,36 +2184,89 @@
 
       logs.forEach(l => {
         const tr = document.createElement("tr");
+        tr.className = "border-b border-gray-200 dark:border-slate-800";
         tr.innerHTML = `
-          <td class="p-2.5 themed-text-muted">${l.timestamp || "-"}</td>
-          <td class="p-2.5 font-semibold">${l.username || "-"}</td>
-          <td class="p-2.5">${l.activity || "-"}</td>
+          <td class="p-2.5 text-gray-500 dark:text-gray-400">${new Date(l.timestamp).toLocaleString()}</td>
+          <td class="p-2.5 font-semibold">${l.username}</td>
+          <td class="p-2.5">${l.activity}</td>
         `;
         tbody.appendChild(tr);
       });
     }
 
+    async function loadAdminData() {
+      showSpinner("Refreshing admin console...");
+      const res = await apiRequest({ action: "getAdminData", username: currentUser });
+      hideSpinner();
+      if (res.status === "success") {
+        adminFetchedUsers = res.usersData || [];
+        renderAdminUsers(res.usersMeta || []);
+        renderAdminLogs(res.activityLogs || []);
+        showToast("Console data refreshed.", "success", 2000);
+      }
+    }
+
+    async function approveUser(targetUser) {
+      showSpinner(`Approving user ${targetUser}...`);
+      const res = await apiRequest({ action: "approveUser", username: currentUser, targetUser });
+      hideSpinner();
+      if (res.status === "success") {
+        showToast(`User ${targetUser} approved successfully.`, "success", 2500);
+        loadAdminData();
+      } else {
+        showModernAlert(res.message || "Failed to approve user.", "Approval Failed", "alert-circle");
+      }
+    }
+
     function viewUserDetail(targetUser) {
       const container = document.getElementById("adminUserDetailContainer");
-      if (!container) return;
-      container.classList.remove("hidden");
+      const title = document.getElementById("userDetailTitle");
+      const overview = document.getElementById("userStatsOverview");
+      const benchmarks = document.getElementById("userBenchmarksList");
 
-      document.getElementById("userDetailTitle").innerText = `User Profile & Performance Stats: ${targetUser}`;
+      title.innerHTML = `<i data-lucide="user-check" class="w-4 h-4"></i> Profile & Stats: ${targetUser}`;
 
-      const savedBenchmarks = JSON.parse(localStorage.getItem(`workout_benchmarks_${targetUser}`) || "{}");
-      const listEl = document.getElementById("userBenchmarksList");
-      listEl.innerHTML = "";
+      const userData = adminFetchedUsers.find(u => u.username === targetUser);
+      const rows = userData ? userData.rows || [] : [];
 
-      Object.keys(savedBenchmarks).forEach(ex => {
-        const card = document.createElement("div");
-        card.className = "themed-subcard p-2 rounded-lg border text-xs";
-        card.innerHTML = `<span class="themed-text-muted block text-[10px]">${ex}</span><b>${savedBenchmarks[ex]} kg</b>`;
-        listEl.appendChild(card);
+      const totalWorkouts = rows.length;
+      const totalVolume = rows.reduce((acc, r) => acc + (r.working_load * ((r.set1||0)+(r.set2||0)+(r.set3||0)+(r.set4||0))), 0);
+
+      overview.innerHTML = `
+        <div class="themed-subcard p-3 rounded-xl border text-center"><span class="block text-xs themed-text-muted">Total Exercises Logged</span><span class="text-lg font-black text-blue-600 dark:text-blue-400">${totalWorkouts}</span></div>
+        <div class="themed-subcard p-3 rounded-xl border text-center"><span class="block text-xs themed-text-muted">Total Lifetime Volume</span><span class="text-lg font-black text-emerald-600 dark:text-emerald-400">${Math.round(totalVolume)} kg</span></div>
+        <div class="themed-subcard p-3 rounded-xl border text-center"><span class="block text-xs themed-text-muted">Active Weeks</span><span class="text-lg font-black text-purple-600 dark:text-purple-400">${new Set(rows.map(r => r.project_name)).size}</span></div>
+      `;
+
+      benchmarks.innerHTML = "";
+      Object.keys(initialBenchmarkLoads).forEach(ex => {
+        const exRows = rows.filter(r => r.exercise === ex);
+        const maxLoad = exRows.length > 0 ? Math.max(...exRows.map(r => r.working_load)) : (initialBenchmarkLoads[ex] || 0);
+        benchmarks.innerHTML += `
+          <div class="themed-subcard p-2 rounded-lg border text-xs">
+            <span class="block text-[10px] themed-text-muted truncate">${ex}</span>
+            <span class="font-bold text-blue-600 dark:text-blue-400">${maxLoad} kg</span>
+          </div>
+        `;
       });
+
+      container.classList.remove("hidden");
+      lucide.createIcons();
     }
 
     function closeUserDetail() {
       document.getElementById("adminUserDetailContainer").classList.add("hidden");
+    }
+
+    function syncDataToServer() {
+      if (!currentUser || !currentProject) return;
+      const localData = localStorage.getItem(`workout_data_${currentUser}_${currentProject}`);
+      if (!localData) return;
+      
+      const rows = JSON.parse(localData);
+      rows.forEach(record => {
+        apiRequest({ action: "saveWorkoutRow", username: currentUser, record }, { silentAuthError: true });
+      });
     }
   </script>
 </body>
