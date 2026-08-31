@@ -17,752 +17,122 @@
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#eef6ff', 100: '#e0edff', 200: '#c7e0ff',
-              300: '#9ecaff', 400: '#6da9ff', 500: '#3b7eff',
-              600: '#0066FF', 700: '#0052cc', 800: '#0043a4', 900: '#003684'
-            }
-          },
-          fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-          }
-        }
-      }
-    }
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <style>
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
+      transition: background-color 0.3s ease, color 0.3s ease;
     }
-    
-    .themed-bg-base { @apply bg-slate-900 text-slate-100; }
-    .themed-card { @apply bg-slate-800/80 border-slate-700/60 text-slate-100; }
-    .themed-subcard { @apply bg-slate-800/40 border-slate-700/40; }
-    .themed-input { @apply bg-slate-900/90 border-slate-700 text-white placeholder-slate-500 focus:border-brand-500 focus:ring-brand-500/20; }
-    .themed-text-muted { @apply text-slate-400; }
-    .themed-border { @apply border-slate-700/60; }
 
-    .theme-light body, body.theme-light { @apply bg-slate-50 text-slate-900; }
-    .theme-light .themed-bg-base { @apply bg-slate-50 text-slate-900; }
-    .theme-light .themed-card { @apply bg-white border-slate-200 text-slate-900 shadow-sm; }
-    .theme-light .themed-subcard { @apply bg-slate-100/70 border-slate-200; }
-    .theme-light .themed-input { @apply bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-brand-600 focus:ring-brand-600/20; }
-    .theme-light .themed-text-muted { @apply text-slate-500; }
-    .theme-light .themed-border { @apply border-slate-200; }
+    /* Light Theme (Default) */
+    :root {
+      --bg-main: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-subcard: #f1f5f9;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --nav-bg: rgba(255, 255, 255, 0.85);
+      --input-bg: #f8fafc;
+    }
+
+    /* Dark Theme */
+    .dark {
+      --bg-main: #0b0f19;
+      --bg-card: #151c2c;
+      --bg-subcard: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+      --nav-bg: rgba(21, 28, 44, 0.85);
+      --input-bg: #0f172a;
+    }
+
+    .themed-bg { background-color: var(--bg-main); }
+    .themed-card { background-color: var(--bg-card); }
+    .themed-subcard { background-color: var(--bg-subcard); }
+    .themed-text { color: var(--text-main); }
+    .themed-text-muted { color: var(--text-muted); }
+    .themed-border { border-color: var(--border-color); }
+    .themed-nav { background-color: var(--nav-bg); }
+    .themed-input { background-color: var(--input-bg); }
 
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-    .nav-tab.active {
-      @apply text-brand-500 font-semibold;
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(0.98); }
     }
-    .theme-light .nav-tab.active {
-      @apply text-brand-600 font-semibold;
+    .animate-pulse-subtle {
+      animation: pulse-subtle 3s infinite ease-in-out;
     }
 
-    input[type="number"]::-webkit-inner-spin-button,
-    input[type="number"]::-webkit-outer-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
+    /* Pull to Refresh Spinner */
+    #ptr-indicator {
+      transition: transform 0.2s ease, opacity 0.2s ease;
     }
   </style>
 </head>
-<body class="themed-bg-base min-h-screen flex flex-col justify-between antialiased selection:bg-brand-500 selection:text-white transition-colors duration-200">
+<body class="themed-bg themed-text min-h-screen flex flex-col antialiased selection:bg-blue-500 selection:text-white pb-24 md:pb-0">
 
-  <header class="sticky top-0 z-40 backdrop-blur-md themed-card border-b border-x-0 border-t-0 px-4 py-3 flex items-center justify-between">
-    <div class="flex items-center space-x-2">
-      <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
-        <i data-lucide="dumbbell" class="w-4 h-4"></i>
-      </div>
-      <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-brand-500 to-brand-400 bg-clip-text text-transparent">CoreGrip</span>
+  <div id="ptr-indicator" class="fixed top-0 left-0 right-0 z-50 flex justify-center items-center py-3 opacity-0 pointer-events-none transform -translate-y-full">
+    <div class="themed-card border themed-border px-4 py-2 rounded-full shadow-lg flex items-center space-x-2 text-xs font-semibold text-blue-500">
+      <i data-lucide="refresh-cw" class="w-4 h-4 animate-spin" id="ptr-icon"></i>
+      <span id="ptr-text">Tarikh untuk memperbarui...</span>
     </div>
+  </div>
 
-    <div class="flex items-center space-x-2">
-      <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2 rounded-xl themed-subcard border text-slate-400 hover:text-white transition-colors">
-        <i data-lucide="moon" class="w-4 h-4 dark-icon hidden"></i>
-        <i data-lucide="sun" class="w-4 h-4 light-icon hidden"></i>
-      </button>
-
-      <div id="userProfileBadge" class="hidden items-center space-x-2 pl-2 border-l themed-border">
-        <div class="text-right hidden sm:block">
-          <div id="badgeUsername" class="text-xs font-bold leading-none"></div>
-          <div id="badgeRole" class="text-[10px] themed-text-muted capitalize"></div>
+  <header class="sticky top-0 z-40 backdrop-blur-md themed-nav border-b themed-border px-4 py-3 transition-all duration-200">
+    <div class="max-w-5xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 font-black text-lg tracking-wider">
+          C
         </div>
-        <button onclick="handleLogout()" class="p-2 rounded-xl themed-subcard border text-rose-400 hover:text-rose-500 transition-colors" title="Logout">
-          <i data-lucide="log-out" class="w-4 h-4"></i>
+        <div>
+          <h1 class="font-extrabold text-base leading-tight tracking-tight flex items-center gap-1.5">
+            CoreGrip
+            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">PRO</span>
+          </h1>
+          <p class="text-[10px] themed-text-muted font-medium leading-none">Auto-Progression Engine</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2 rounded-xl themed-subcard text-slate-500 hover:text-blue-500 transition-colors border themed-border" aria-label="Toggle Theme">
+          <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i>
+          <i data-lucide="sun" class="w-4 h-4 hidden dark:block text-amber-400"></i>
         </button>
+
+        <div id="headerAuthWidget">
+          </div>
       </div>
     </div>
   </header>
 
-  <main class="flex-1 max-w-md w-full mx-auto px-4 py-6 mb-20">
-    
-    <section id="authSection" class="space-y-6">
-      <div class="text-center space-y-2">
-        <h1 class="text-2xl font-bold tracking-tight">Selamat Datang</h1>
-        <p class="text-xs themed-text-muted">Masuk atau daftar untuk mencatat progresi latihan resistance training Anda secara presisi.</p>
-      </div>
-
-      <div class="themed-card p-5 rounded-2xl border shadow-xl space-y-4">
-        <div class="flex p-1 themed-subcard rounded-xl border">
-          <button id="tabLogin" onclick="switchAuthTab('login')" class="flex-1 py-2 text-xs font-semibold rounded-lg bg-brand-600 text-white transition-all">Masuk</button>
-          <button id="tabRegister" onclick="switchAuthTab('register')" class="flex-1 py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">Daftar</button>
-        </div>
-
-        <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-3">
-          <div>
-            <label class="block text-xs font-medium mb-1 themed-text-muted">Username</label>
-            <input type="text" id="loginUsername" required class="w-full px-3 py-2.5 rounded-xl text-xs themed-input border outline-none transition-all" placeholder="Masukkan username">
-          </div>
-          <div>
-            <label class="block text-xs font-medium mb-1 themed-text-muted">Password</label>
-            <input type="password" id="loginPassword" required class="w-full px-3 py-2.5 rounded-xl text-xs themed-input border outline-none transition-all" placeholder="••••••••">
-          </div>
-          <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl text-xs shadow-lg shadow-brand-600/30 transition-all flex items-center justify-center space-x-2">
-            <span>Masuk ke Akun</span>
-            <i data-lucide="arrow-right" class="w-4 h-4"></i>
-          </button>
-        </form>
-
-        <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-3 hidden">
-          <div>
-            <label class="block text-xs font-medium mb-1 themed-text-muted">Username Baru</label>
-            <input type="text" id="regUsername" required class="w-full px-3 py-2.5 rounded-xl text-xs themed-input border outline-none transition-all" placeholder="Pilih username unik">
-          </div>
-          <div>
-            <label class="block text-xs font-medium mb-1 themed-text-muted">Password</label>
-            <input type="password" id="regPassword" required class="w-full px-3 py-2.5 rounded-xl text-xs themed-input border outline-none transition-all" placeholder="Minimal 6 karakter">
-          </div>
-          <div>
-            <label class="block text-xs font-medium mb-1 themed-text-muted">Role / Peran</label>
-            <select id="regRole" class="w-full px-3 py-2.5 rounded-xl text-xs themed-input border outline-none transition-all">
-              <option value="user">User biasa (Member Fitness)</option>
-              <option value="admin">Admin (Manager Data / Coach)</option>
-            </select>
-          </div>
-          <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl text-xs shadow-lg shadow-brand-600/30 transition-all flex items-center justify-center space-x-2">
-            <span>Buat Akun Sekarang</span>
-            <i data-lucide="user-plus" class="w-4 h-4"></i>
-          </button>
-        </form>
-
-        <div id="authAlert" class="hidden p-3 rounded-xl text-xs border text-center font-medium"></div>
-      </div>
-    </section>
-
-    <section id="appSection" class="hidden space-y-6">
-      
-      <div id="tabContentLog" class="space-y-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-lg font-bold">Log Progresi</h2>
-            <p class="text-xs themed-text-muted">Catat beban & repetisi terbaru per gerakan.</p>
-          </div>
-          <button onclick="openAddExerciseModal()" class="px-3 py-2 bg-brand-600 text-white rounded-xl text-xs font-semibold flex items-center space-x-1 shadow-md shadow-brand-600/20">
-            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-            <span>Tambah Baseline</span>
-          </button>
-        </div>
-
-        <div id="exerciseList" class="space-y-3">
-          </div>
-      </div>
-
-      <div id="tabContentAnalytics" class="hidden space-y-4">
-        <div>
-          <h2 class="text-lg font-bold">Analisis Beban (Est. 1RM)</h2>
-          <p class="text-xs themed-text-muted">Grafik estimasi kekuatan maksimal berdasarkan data log.</p>
-        </div>
-
-        <div class="themed-card p-4 rounded-2xl border space-y-3">
-          <label class="block text-xs font-medium themed-text-muted">Pilih Latihan</label>
-          <select id="analyticsExerciseSelect" onchange="renderAnalyticsChart()" class="w-full px-3 py-2 rounded-xl text-xs themed-input border outline-none">
-            </select>
-          <div class="relative h-64 w-full pt-2">
-            <canvas id="progressionChart"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <div id="tabContentAdmin" class="hidden space-y-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-lg font-bold">Admin Management</h2>
-            <p class="text-xs themed-text-muted">Kelola akun dan pantau benchmark baseline pengguna server.</p>
-          </div>
-          <button onclick="loadAdminUserData()" class="p-2 themed-subcard rounded-xl border text-xs flex items-center space-x-1">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-            <span>Refresh</span>
-          </button>
-        </div>
-
-        <div class="themed-card rounded-2xl border overflow-hidden">
-          <div class="p-3 border-b themed-border font-semibold text-xs flex justify-between items-center">
-            <span>Daftar User Terdaftar</span>
-            <span id="userCountBadge" class="px-2 py-0.5 rounded-full text-[10px] bg-brand-500/20 text-brand-400">0 User</span>
-          </div>
-          <div id="adminUserList" class="divide-y themed-border max-h-80 overflow-y-auto">
-            </div>
-        </div>
-
-        <div id="adminUserDetailContainer" class="hidden themed-card p-4 rounded-2xl border space-y-3">
-          <div class="flex items-center justify-between border-b themed-border pb-2">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-brand-500" id="detailUsernameTitle">Detail User</h3>
-            <button onclick="closeUserDetail()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
-          </div>
-          <div id="adminUserBenchmarksList" class="grid grid-cols-2 gap-2">
-            </div>
-        </div>
-      </div>
-
-    </section>
-
-  </main>
-
-  <nav id="mainNav" class="fixed bottom-0 left-0 right-0 z-40 themed-card border-t border-x-0 border-b-0 px-6 py-2 flex justify-around items-center max-w-md mx-auto hidden">
-    <button onclick="switchTab('log')" id="navLog" class="nav-tab active flex flex-col items-center space-y-1 text-slate-400 transition-colors">
-      <i data-lucide="clipboard-list" class="w-5 h-5"></i>
-      <span class="text-[10px]">Log Progres</span>
-    </button>
-    <button onclick="switchTab('analytics')" id="navAnalytics" class="nav-tab flex flex-col items-center space-y-1 text-slate-400 transition-colors">
-      <i data-lucide="line-chart" class="w-5 h-5"></i>
-      <span class="text-[10px]">Grafik</span>
-    </button>
-    <button onclick="switchTab('admin')" id="navAdmin" class="nav-tab hidden flex flex-col items-center space-y-1 text-slate-400 transition-colors">
-      <i data-lucide="shield-check" class="w-5 h-5"></i>
-      <span class="text-[10px]">Admin</span>
-    </button>
-  </nav>
-
-  <div id="addModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="themed-card w-full max-w-sm p-5 rounded-2xl border shadow-2xl space-y-4">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-bold">Tambah Baseline Latihan</h3>
-        <button onclick="closeAddExerciseModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
-      </div>
-      <form onsubmit="handleAddExercise(event)" class="space-y-3">
-        <div>
-          <label class="block text-xs font-medium mb-1 themed-text-muted">Nama Latihan / Gerakan</label>
-          <input type="text" id="newExName" required placeholder="misal: Overhead Press" class="w-full px-3 py-2 rounded-xl text-xs themed-input border outline-none">
-        </div>
-        <div>
-          <label class="block text-xs font-medium mb-1 themed-text-muted">Beban Awal Baseline (kg)</label>
-          <input type="number" step="0.5" id="newExWeight" required placeholder="40" class="w-full px-3 py-2 rounded-xl text-xs themed-input border outline-none">
-        </div>
-        <div class="flex space-x-2 pt-2">
-          <button type="button" onclick="closeAddExerciseModal()" class="flex-1 py-2.5 rounded-xl border themed-subcard text-xs font-medium">Batal</button>
-          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-brand-600 text-white text-xs font-semibold shadow-md shadow-brand-600/30">Simpan</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script>
-    // State management
-    let currentUser = null;
-    let usersDb = [];
-    let userLogs = {};
-    let chartInstance = null;
-
-    const DEFAULT_EXERCISES = [
-      { name: "Bench Press", defaultKg: 60 },
-      { name: "Squat", defaultKg: 80 },
-      { name: "Deadlift", defaultKg: 100 },
-      { name: "Pull Up (Weighted)", defaultKg: 10 }
-    ];
-
-    // Initialize Application
-    document.addEventListener("DOMContentLoaded", () => {
-      initTheme();
-      loadStoredUsers();
-      checkAuthStatus();
-      lucide.createIcons();
-    });
-
-    // Theme Switcher
-    function initTheme() {
-      const isLight = localStorage.getItem("theme") === "light";
-      if (isLight) {
-        document.documentElement.classList.add("theme-light");
-        document.querySelector(".light-icon")?.classList.remove("hidden");
-      } else {
-        document.documentElement.classList.remove("theme-light");
-        document.querySelector(".dark-icon")?.classList.remove("hidden");
-      }
-    }
-
-    function toggleTheme() {
-      const isLight = document.documentElement.classList.toggle("theme-light");
-      localStorage.setItem("theme", isLight ? "light" : "dark");
-      
-      const darkIcon = document.querySelector(".dark-icon");
-      const lightIcon = document.querySelector(".light-icon");
-      if (isLight) {
-        darkIcon?.classList.add("hidden");
-        lightIcon?.classList.remove("hidden");
-      } else {
-        lightIcon?.classList.add("hidden");
-        darkIcon?.classList.remove("hidden");
-      }
-      if (currentUser) renderAnalyticsChart();
-    }
-
-    // Auth & Storage Handlers
-    function loadStoredUsers() {
-      const saved = localStorage.getItem("coregrip_users");
-      if (saved) {
-        try { usersDb = JSON.parse(saved); } catch (e) { usersDb = []; }
-      }
-      if (!usersDb.length) {
-        // Seed default admin and standard user
-        usersDb = [
-          { username: "admin", password: "password123", role: "admin", baselines: { "Bench Press": 80, "Squat": 100 } },
-          { username: "user", password: "password123", role: "user", baselines: { "Bench Press": 50, "Squat": 70 } }
-        ];
-        saveUsers();
-      }
-    }
-
-    function saveUsers() {
-      localStorage.setItem("coregrip_users", JSON.stringify(usersDb));
-    }
-
-    function checkAuthStatus() {
-      const savedSession = localStorage.getItem("coregrip_session");
-      const mainNav = document.getElementById("mainNav");
-      if (savedSession) {
-        try {
-          currentUser = JSON.parse(savedSession);
-          showAppScreen();
-          mainNav.classList.remove("hidden");
-          return;
-        } catch (e) {
-          currentUser = null;
-        }
-      }
-      showAuthScreen();
-      mainNav.classList.add("hidden");
-    }
-
-    function switchAuthTab(tab) {
-      const loginForm = document.getElementById("loginForm");
-      const regForm = document.getElementById("registerForm");
-      const tabLogin = document.getElementById("tabLogin");
-      const tabRegister = document.getElementById("tabRegister");
-      const alert = document.getElementById("authAlert");
-      alert.classList.add("hidden");
-
-      if (tab === "login") {
-        loginForm.classList.remove("hidden");
-        regForm.classList.add("hidden");
-        tabLogin.className = "flex-1 py-2 text-xs font-semibold rounded-lg bg-brand-600 text-white transition-all";
-        tabRegister.className = "flex-1 py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
-      } else {
-        loginForm.classList.add("hidden");
-        regForm.classList.remove("hidden");
-        tabRegister.className = "flex-1 py-2 text-xs font-semibold rounded-lg bg-brand-600 text-white transition-all";
-        tabLogin.className = "flex-1 py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
-      }
-    }
-
-    function showAuthAlert(msg, isSuccess = false) {
-      const alert = document.getElementById("authAlert");
-      alert.textContent = msg;
-      alert.className = `p-3 rounded-xl text-xs border text-center font-medium ${
-        isSuccess 
-          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-          : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-      }`;
-      alert.classList.remove("hidden");
-    }
-
-    function handleLogin(e) {
-      e.preventDefault();
-      const u = document.getElementById("loginUsername").value.trim();
-      const p = document.getElementById("loginPassword").value;
-
-      const user = usersDb.find(item => item.username.toLowerCase() === u.toLowerCase());
-      if (!user || user.password !== p) {
-        showAuthAlert("Username atau password salah!");
-        return;
-      }
-
-      currentUser = user;
-      localStorage.setItem("coregrip_session", JSON.stringify(currentUser));
-      document.getElementById("mainNav").classList.remove("hidden");
-      showAppScreen();
-    }
-
-    function handleRegister(e) {
-      e.preventDefault();
-      const u = document.getElementById("regUsername").value.trim();
-      const p = document.getElementById("regPassword").value;
-      const r = document.getElementById("regRole").value;
-
-      if (usersDb.some(item => item.username.toLowerCase() === u.toLowerCase())) {
-        showAuthAlert("Username sudah terpakai!");
-        return;
-      }
-
-      const newUser = { username: u, password: p, role: r, baselines: {} };
-      DEFAULT_EXERCISES.forEach(ex => newUser.baselines[ex.name] = ex.defaultKg);
-
-      usersDb.push(newUser);
-      saveUsers();
-
-      currentUser = newUser;
-      localStorage.setItem("coregrip_session", JSON.stringify(currentUser));
-      document.getElementById("mainNav").classList.remove("hidden");
-      showAppScreen();
-    }
-
-    function handleLogout() {
-      currentUser = null;
-      localStorage.removeItem("coregrip_session");
-      document.getElementById("mainNav").classList.add("hidden");
-      showAuthScreen();
-    }
-
-    function showAuthScreen() {
-      document.getElementById("authSection").classList.remove("hidden");
-      document.getElementById("appSection").classList.add("hidden");
-      document.getElementById("userProfileBadge").classList.add("hidden");
-      document.getElementById("userProfileBadge").classList.remove("flex");
-    }
-
-    function showAppScreen() {
-      document.getElementById("authSection").classList.add("hidden");
-      document.getElementById("appSection").classList.remove("hidden");
-      
-      // Update badge Header
-      const badge = document.getElementById("userProfileBadge");
-      document.getElementById("badgeUsername").textContent = currentUser.username;
-      document.getElementById("badgeRole").textContent = currentUser.role;
-      badge.classList.remove("hidden");
-      badge.classList.add("flex");
-
-      // Set visible tab links for admin
-      const navAdminBtn = document.getElementById("navAdmin");
-      if (currentUser.role === "admin") {
-        navAdminBtn.classList.remove("hidden");
-      } else {
-        navAdminBtn.classList.add("hidden");
-      }
-
-      loadLogsForUser();
-      switchTab('log');
-    }
-
-    // Data Management
-    function loadLogsForUser() {
-      const savedLogs = localStorage.getItem(`workout_logs_${currentUser.username}`);
-      if (savedLogs) {
-        try { userLogs = JSON.parse(savedLogs); } catch (e) { userLogs = {}; }
-      } else {
-        userLogs = {};
-        // Initialize with baselines if empty
-        const baselines = currentUser.baselines || {};
-        DEFAULT_EXERCISES.forEach(ex => {
-          const baseWeight = baselines[ex.name] || ex.defaultKg;
-          userLogs[ex.name] = [
-            { date: new Date().toISOString().split('T')[0], weight: baseWeight, reps: 5, estOneRepMax: calculate1RM(baseWeight, 5) }
-          ];
-        });
-        saveUserLogs();
-      }
-    }
-
-    function saveUserLogs() {
-      localStorage.setItem(`workout_logs_${currentUser.username}`, JSON.stringify(userLogs));
-    }
-
-    function calculate1RM(weight, reps) {
-      // Epley Formula: 1RM = w * (1 + r/30)
-      return Math.round(weight * (1 + reps / 30));
-    }
-
-    // UI Renderers
-    function renderExerciseList() {
-      const container = document.getElementById("exerciseList");
-      container.innerHTML = "";
-
-      const keys = Object.keys(userLogs);
-      if (!keys.length) {
-        container.innerHTML = `<div class="p-6 text-center text-xs themed-text-muted themed-card rounded-2xl border">Belum ada data latihan. Klik Tambah Baseline untuk memulai.</div>`;
-        return;
-      }
-
-      keys.forEach(exName => {
-        const history = userLogs[exName] || [];
-        const latest = history[history.length - 1] || { weight: 0, reps: 0, estOneRepMax: 0 };
-
-        const card = document.createElement("div");
-        card.className = "themed-card p-4 rounded-2xl border space-y-3 transition-all";
-        card.innerHTML = `
-          <div class="flex items-center justify-between">
-            <h3 class="font-bold text-sm tracking-tight">${exName}</h3>
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 font-medium">Est 1RM: ${latest.estOneRepMax || 0} kg</span>
-          </div>
-          <div class="grid grid-cols-2 gap-2 text-xs">
-            <div class="themed-subcard p-2.5 rounded-xl border">
-              <span class="themed-text-muted text-[10px] block">Beban Terakhir</span>
-              <span class="font-bold text-sm">${latest.weight} kg</span>
-            </div>
-            <div class="themed-subcard p-2.5 rounded-xl border">
-              <span class="themed-text-muted text-[10px] block">Repetisi</span>
-              <span class="font-bold text-sm">${latest.reps} Reps</span>
-            </div>
-          </div>
-          <form onsubmit="handleAddLogEntry(event, '${exName}')" class="flex items-center space-x-2 pt-1">
-            <input type="number" step="0.5" placeholder="Kg" required class="w-1/3 px-2.5 py-2 rounded-xl text-xs themed-input border outline-none">
-            <input type="number" placeholder="Reps" required class="w-1/3 px-2.5 py-2 rounded-xl text-xs themed-input border outline-none">
-            <button type="submit" class="w-1/3 py-2 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl text-xs flex items-center justify-center space-x-1 shadow-sm">
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-              <span>Log</span>
-            </button>
-          </form>
-        `;
-        container.appendChild(card);
-      });
-      lucide.createIcons();
-    }
-
-    function handleAddLogEntry(e, exName) {
-      e.preventDefault();
-      const inputs = e.target.querySelectorAll("input");
-      const weight = parseFloat(inputs[0].value);
-      const reps = parseInt(inputs[1].value);
-
-      if (isNaN(weight) || isNaN(reps)) return;
-
-      const entry = {
-        date: new Date().toISOString().split('T')[0],
-        weight: weight,
-        reps: reps,
-        estOneRepMax: calculate1RM(weight, reps)
-      };
-
-      if (!userLogs[exName]) userLogs[exName] = [];
-      userLogs[exName].push(entry);
-      saveUserLogs();
-
-      // update baseline user object inside DB
-      const userInDb = usersDb.find(u => u.username === currentUser.username);
-      if (userInDb) {
-        if (!userInDb.baselines) userInDb.baselines = {};
-        userInDb.baselines[exName] = weight;
-        saveUsers();
-      }
-
-      e.target.reset();
-      renderExerciseList();
-    }
-
-    // Modal Add Exercise
-    function openAddExerciseModal() {
-      document.getElementById("addModal").classList.remove("hidden");
-    }
-    function closeAddExerciseModal() {
-      document.getElementById("addModal").classList.add("hidden");
-    }
-    function handleAddExercise(e) {
-      e.preventDefault();
-      const name = document.getElementById("newExName").value.trim();
-      const weight = parseFloat(document.getElementById("newExWeight").value);
-
-      if (!name || isNaN(weight)) return;
-
-      if (!userLogs[name]) {
-        userLogs[name] = [
-          { date: new Date().toISOString().split('T')[0], weight: weight, reps: 5, estOneRepMax: calculate1RM(weight, 5) }
-        ];
-        saveUserLogs();
-      }
-
-      closeAddExerciseModal();
-      document.getElementById("newExName").value = "";
-      document.getElementById("newExWeight").value = "";
-      renderExerciseList();
-    }
-
-    // Navigation Switcher
-    function switchTab(tab) {
-      document.querySelectorAll(".nav-tab").forEach(btn => btn.classList.remove("active"));
-      document.getElementById("tabContentLog").classList.add("hidden");
-      document.getElementById("tabContentAnalytics").classList.add("hidden");
-      document.getElementById("tabContentAdmin").classList.add("hidden");
-
-      if (tab === 'log') {
-        document.getElementById("navLog").classList.add("active");
-        document.getElementById("tabContentLog").classList.remove("hidden");
-        renderExerciseList();
-      } else if (tab === 'analytics') {
-        document.getElementById("navAnalytics").classList.add("active");
-        document.getElementById("tabContentAnalytics").classList.remove("hidden");
-        populateAnalyticsSelect();
-      } else if (tab === 'admin') {
-        document.getElementById("navAdmin").classList.add("active");
-        document.getElementById("tabContentAdmin").classList.remove("hidden");
-        loadAdminUserData();
-      }
-    }
-
-    // Analytics Chart Renderer
-    function populateAnalyticsSelect() {
-      const select = document.getElementById("analyticsExerciseSelect");
-      select.innerHTML = "";
-      const exercises = Object.keys(userLogs);
-      
-      if (!exercises.length) {
-        select.innerHTML = "<option>Belum ada data</option>";
-        return;
-      }
-
-      exercises.forEach(ex => {
-        const opt = document.createElement("option");
-        opt.value = ex;
-        opt.textContent = ex;
-        select.appendChild(opt);
-      });
-
-      renderAnalyticsChart();
-    }
-
-    function renderAnalyticsChart() {
-      const select = document.getElementById("analyticsExerciseSelect");
-      const exName = select.value;
-      const history = userLogs[exName] || [];
-
-      const labels = history.map((h, idx) => h.date || `Session ${idx + 1}`);
-      const dataPoints = history.map(h => h.estOneRepMax);
-
-      const ctx = document.getElementById("progressionChart").getContext("2d");
-      if (chartInstance) chartInstance.destroy();
-
-      const isLight = document.documentElement.classList.contains("theme-light");
-      const textColor = isLight ? '#64748b' : '#94a3b8';
-      const gridColor = isLight ? '#e2e8f0' : '#334155';
-
-      chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Est. 1RM (kg)',
-            data: dataPoints,
-            borderColor: '#0066FF',
-            backgroundColor: 'rgba(0, 102, 255, 0.1)',
-            fill: true,
-            tension: 0.3,
-            pointBackgroundColor: '#0066FF',
-            pointRadius: 4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false }
-          },
-          scales: {
-            x: {
-              ticks: { color: textColor, font: { size: 10 } },
-              grid: { color: gridColor }
-            },
-            y: {
-              ticks: { color: textColor, font: { size: 10 } },
-              grid: { color: gridColor }
-            }
-          }
-        }
-      });
-    }
-
-    // Admin Panel Logic
-    function loadAdminUserData() {
-      const container = document.getElementById("adminUserList");
-      const badge = document.getElementById("userCountBadge");
-      container.innerHTML = "";
-      badge.textContent = `${usersDb.length} User`;
-
-      usersDb.forEach(u => {
-        const item = document.createElement("div");
-        item.className = "p-3 flex items-center justify-between hover:bg-slate-500/5 transition-colors text-xs";
-        item.innerHTML = `
-          <div>
-            <span class="font-bold block">${u.username}</span>
-            <span class="themed-text-muted text-[10px] capitalize">Role: ${u.role}</span>
-          </div>
-          <button onclick="viewUserDetail('${u.username}')" class="px-2.5 py-1 rounded-lg border themed-subcard text-[11px] font-medium hover:border-brand-500 transition-colors">
-            Detail Baseline
-          </button>
-        `;
-        container.appendChild(item);
-      });
-    }
-
-    function viewUserDetail(username) {
-      const container = document.getElementById("adminUserDetailContainer");
-      const title = document.getElementById("detailUsernameTitle");
-      const benchmarksList = document.getElementById("adminUserBenchmarksList");
-
-      title.textContent = `Baseline User: ${username}`;
-      container.classList.remove("hidden");
-
-      const serverUser = usersDb.find(u =>
-        String(u.username || "").toLowerCase() === String(username || "").toLowerCase()
-      );
-      let savedBenchmarks = serverUser?.baselines || {};
-      
-      // Fallback check to localstorage if empty
-      if (!savedBenchmarks || !Object.keys(savedBenchmarks).length) {
-        try {
-          const userLogsSaved = JSON.parse(localStorage.getItem(`workout_logs_${username}`) || "{}");
-          savedBenchmarks = {};
-          Object.keys(userLogsSaved).forEach(k => {
-            const arr = userLogsSaved[k];
-            if (arr && arr.length) savedBenchmarks[k] = arr[arr.length - 1].weight;
-          });
-        } catch (e) {
-          savedBenchmarks = {};
-        }
-      }
-
-      benchmarksList.innerHTML = "";
-      const benchmarkEntries = Object.entries(savedBenchmarks);
-      if (!benchmarkEntries.length) {
-        benchmarksList.innerHTML = `<div class="col-span-full themed-subcard p-3 rounded-xl border text-xs themed-text-muted text-center">Tidak ada data baseline untuk user ini.</div>`;
-      } else {
-        benchmarkEntries.forEach(([ex, value]) => {
-          const div = document.createElement("div");
-          div.className = "themed-subcard p-2.5 rounded-xl border text-xs";
-          div.innerHTML = `<span class="themed-text-muted block text-[10px]">${ex}</span><b class="text-sm">${Number(value)} kg</b>`;
-          benchmarksList.appendChild(div);
-        });
-      }
-
-      lucide.createIcons();
-      container.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function closeUserDetail() {
-      document.getElementById("adminUserDetailContainer").classList.add("hidden");
-    }
-  </script>
-</body>
-</html>
+  <nav id="mainNav" class="hidden fixed bottom-0 left-0 right-0 z-40 md:sticky md:top-[61px] themed-nav border-t md:border-t-0 md:border-b themed-border backdrop-blur-md transition-all duration-200">
+    <div class="max-w-5xl mx-auto px-2 md:px-4">
+      <div class="flex justify-around md:justify-start md:space-x-2 py-2 md:py-1.5">
+        <button onclick="switchTab('log')" id="nav-log" class="nav-btn flex flex-col md:flex-row items-center justify-center py-1.5 px-3 md:px-4 rounded-xl text-xs font-semibold transition-all text-blue-600 bg-blue-500/10">
+          <i data-lucide="notebook-pen" class="w-5 h-5 md:w-4 md:h-4 md:mr-2 mb-1 md:mb-0"></i>
+          <span>Workout Log</span>
+        </button>
+        <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-btn flex flex-col md:flex-row items-center justify-center py-1.5 px-3 md:px-4 rounded-xl text-xs font-semibold transition-all themed-text-muted hover:bg-slate-500/10">
+          <i data-lucide="trending-up" class="w-5 h-5 md:w-4 md:h-4 md:mr-2 mb-1 md:mb-0"></i>
+          <span>Analytics</span>
+        </button>
+        <button onclick="switchTab('history')" id="nav-history" class="nav-btn flex flex-col md:flex-row items-center justify-center py-1.5 px-3 md:px-4 rounded-xl text-xs font-semibold transition-all themed-text-muted hover:bg-slate-500/10">
+          <i data-lucide="history" class="w-5 h-5 md:w-4 md:h-4 md:mr-2 mb-1 md:mb-0"></i>
+          <span>History</span>
+        </button>
+        <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col md:flex-row items-center justify-center py-1.5 px-3 md:px-4 rounded-xl text-xs font-semibold transition-all themed-text-muted hover:bg-slate-500/10">
+          <i data-lucide="settings" class="w-5 h-5 md:w-4 md:h-4 md:mr-2 mb-1 md:mb-0"></i>
+          <span>Settings</span>
